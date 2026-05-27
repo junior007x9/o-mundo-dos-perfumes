@@ -15,6 +15,7 @@ export const produtos = sqliteTable('produtos', {
   precoCusto: real('preco_custo').notNull(),
   precoVenda: real('preco_venda').notNull(),
   estoque: integer('estoque').notNull().default(0),
+  codigoBarras: text('codigo_barras'), // 🚀 NOVO CAMPO ADICIONADO AQUI
 });
 
 export const clientes = sqliteTable('clientes', {
@@ -49,7 +50,6 @@ export const itensVenda = sqliteTable('itens_venda', {
   precoUnitario: real('preco_unitario').notNull(),
 });
 
-// NOVO: Tabela de Fornecedores
 export const fornecedores = sqliteTable('fornecedores', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   nomeFantasia: text('nome_fantasia').notNull(),
