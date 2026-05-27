@@ -1,4 +1,4 @@
-'use client'; // Necessário para controlar o botão de abrir/fechar o menu
+'use client'; 
 
 import { useState } from 'react';
 import Link from 'next/link';
@@ -36,16 +36,15 @@ export default function DashboardLayout({
         </button>
       </div>
 
-      {/* Overlay escuro (Fundo embaçado ao abrir o menu no mobile) */}
+      {/* Overlay escuro */}
       {menuAberto && (
         <div className="fixed inset-0 bg-black/60 z-30 md:hidden backdrop-blur-sm transition-opacity" onClick={fecharMenu}></div>
       )}
 
-      {/* Sidebar - Menu Lateral (Desliza no Mobile, Fixo no Desktop) */}
+      {/* Sidebar - Menu Lateral */}
       <aside className={`fixed inset-y-0 left-0 w-72 md:w-64 bg-[#6A283A] text-white flex flex-col justify-between p-4 shadow-2xl z-40 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${menuAberto ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="overflow-y-auto">
           
-          {/* Logo na Sidebar (Visível no Desktop) */}
           <div className="mb-6 px-2 py-6 border-b border-[#EED9D4]/20 flex-col items-center rounded-xl hidden md:flex">
             <div className="relative w-full h-24 mb-1">
               <Image src="/logo.png" alt="Logo O Mundo dos Perfumes" fill className="object-contain" />
@@ -53,7 +52,6 @@ export default function DashboardLayout({
             <p className="text-xs text-[#EED9D4] uppercase tracking-widest font-bold text-center mt-2">Painel Admin</p>
           </div>
 
-          {/* Cabeçalho da Sidebar (Visível no Mobile) */}
           <div className="flex justify-between items-center md:hidden mb-6 px-2 border-b border-[#EED9D4]/20 pb-4">
             <span className="font-black text-[#EED9D4] tracking-widest text-sm uppercase">Menu</span>
             <button onClick={fecharMenu} className="text-[#EED9D4] hover:text-white">
@@ -61,7 +59,6 @@ export default function DashboardLayout({
             </button>
           </div>
 
-          {/* Links de Navegação */}
           <nav className="space-y-2 mt-4">
             <Link onClick={fecharMenu} href="/dashboard" className="flex items-center space-x-4 px-4 py-3 rounded-lg text-sm font-bold hover:bg-[#EED9D4] hover:text-[#6A283A] transition-all text-white/90">
               <span className="text-xl">📊</span><span>Painel Geral</span>
@@ -93,7 +90,6 @@ export default function DashboardLayout({
         </div>
       </aside>
 
-      {/* Conteúdo Principal */}
       <main className="flex-1 p-4 md:p-8 overflow-y-auto w-full max-w-full">
         {children}
       </main>
