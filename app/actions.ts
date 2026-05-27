@@ -40,3 +40,10 @@ export async function fazerLogin(formData: FormData) {
   // 4. Redireciona para o Painel de Controle
   redirect('/dashboard');
 }
+
+// NOVO: Função para Sair do Sistema com segurança
+export async function sairDoSistema() {
+  const cookieStore = await cookies();
+  cookieStore.delete('usuario_logado_id'); // Destrói o cookie
+  redirect('/'); // Manda de volta pra tela de login
+}

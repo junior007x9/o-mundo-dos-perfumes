@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import { sairDoSistema } from '../actions'; // Importamos a função de segurança
 
 export default function DashboardLayout({
   children,
@@ -41,7 +42,6 @@ export default function DashboardLayout({
             <Link href="/dashboard/vendedores" className="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-bold hover:bg-[#EED9D4] hover:text-[#6A283A] transition-all text-white/90">
               <span className="text-lg">👔</span><span>Vendedores</span>
             </Link>
-            {/* NOVO LINK AQUI */}
             <Link href="/dashboard/fornecedores" className="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-bold hover:bg-[#EED9D4] hover:text-[#6A283A] transition-all text-white/90">
               <span className="text-lg">🚚</span><span>Fornecedores</span>
             </Link>
@@ -49,9 +49,12 @@ export default function DashboardLayout({
         </div>
 
         <div className="pt-4 border-t border-[#EED9D4]/20 mt-4">
-          <Link href="/" className="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-bold bg-black/20 text-[#EED9D4] hover:bg-red-600 hover:text-white transition-all shadow-inner">
-            <span className="text-lg">🚪</span><span>Sair do Sistema</span>
-          </Link>
+          {/* NOVO: Formulário de Logout Seguro */}
+          <form action={sairDoSistema}>
+            <button type="submit" className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-bold bg-black/20 text-[#EED9D4] hover:bg-red-600 hover:text-white transition-all shadow-inner">
+              <span className="text-lg">🚪</span><span>Sair do Sistema</span>
+            </button>
+          </form>
         </div>
       </aside>
 
