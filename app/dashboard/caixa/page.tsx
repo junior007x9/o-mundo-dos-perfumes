@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { getCaixaAberto, getProdutosPDV, abrirCaixa, fecharCaixa, finalizarVenda } from './actions';
-import { Html5QrcodeScanner } from 'html5-qrcode'; // Importa o leitor de câmera
+import { Html5QrcodeScanner } from 'html5-qrcode';
 
 export default function CaixaPage() {
   const [caixa, setCaixa] = useState<any>(null);
@@ -13,7 +13,6 @@ export default function CaixaPage() {
   const [vendaSucesso, setVendaSucesso] = useState<boolean>(false);
   const [dadosUltimaVenda, setDadosUltimaVenda] = useState<any>(null);
 
-  // Estados do Scanner
   const [buscaTexto, setBuscaTexto] = useState('');
   const [cameraAberta, setCameraAberta] = useState(false);
   const inputBuscaRef = useRef<HTMLInputElement>(null);
@@ -29,7 +28,7 @@ export default function CaixaPage() {
     carregarDados();
   }, []);
 
-  // Inicia o leitor da câmera quando o modal é aberto
+  // CORREÇÃO: O TypeScript agora aceita a função de desligar a câmera perfeitamente
   useEffect(() => {
     if (cameraAberta) {
       const scanner = new Html5QrcodeScanner(
@@ -38,13 +37,17 @@ export default function CaixaPage() {
         false
       );
       scanner.render((codigoLido) => {
-        scanner.clear(); // Fecha a câmera
+        scanner.clear();
         setCameraAberta(false);
-        processarBuscaProduto(codigoLido); // Adiciona o produto lido
+        processarBuscaProduto(codigoLido);
       }, () => {});
       
-      return () => scanner.clear().catch(error => console.error("Falha ao limpar scanner", error));
+      // Envelopamos o fechamento para não retornar uma Promise
+      return () => {
+        scanner.clear().catch(error => console.error("Falha ao limpar scanner", error));
+      };
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cameraAberta]);
 
   const formataMoeda = (valor: number) => {
@@ -67,7 +70,6 @@ export default function CaixaPage() {
   const processarBuscaProduto = (termoBusca: string) => {
     if (!termoBusca.trim()) return;
     
-    // Procura por código de barras OU pelo nome
     const prodEncontrado = produtos.find(p => 
       p.codigoBarras === termoBusca || 
       p.nome.toLowerCase().includes(termoBusca.toLowerCase())
@@ -75,12 +77,11 @@ export default function CaixaPage() {
 
     if (prodEncontrado) {
       adicionarAoCarrinho(prodEncontrado);
-      setBuscaTexto(''); // Limpa o campo pro próximo bip
+      setBuscaTexto('');
     } else {
       alert('Produto não encontrado!');
     }
     
-    // Devolve o foco pro input da maquininha
     if (inputBuscaRef.current) inputBuscaRef.current.focus();
   };
 
@@ -100,19 +101,138 @@ export default function CaixaPage() {
     setProdutos(novaLista);
   };
 
-  // Função de Impressão Térmica Omitida por brevidade (já adicionada no passo anterior)
-  const dispararImpressaoTermica = () => { /* ... Manter o mesmo código que passei antes ... */ };
-  const handleFecharCaixa = async () => { /* ... Manter o mesmo código ... */ };
+  const dispararImpressaoTermica = () => {
+    if (!dadosUltimaVenda) return;
+
+    const popup = window.open('', '_blank', 'width=300,height=600');
+    if (!popup) {
+      alert('Por favor, autorize pop-ups para realizar a impressão do cupom!');
+      return;
+    }
+
+    const urlDaLogo = `${window.location.origin}/logo.png`;
+
+    popup.document.write(`
+      <html>
+        <head>
+          <title>Cupom de Venda</title>
+          <style>
+            @page { margin: 0; }
+            body { 
+              font-family: 'Courier New', Courier, monospace; 
+              font-size: 12px; 
+              padding: 12px; 
+              width: 58mm; 
+              margin: 0; 
+              color: #000; 
+              line-height: 1.3;
+            }
+            .center { text-align: center; }
+            .right { text-align: right; }
+            .bold { font-weight: bold; }
+            .divider { border-bottom: 1px dashed #000; margin: 6px 0; }
+            .header-title { font-size: 13px; font-weight: bold; margin-top: 4px; margin-bottom: 2px; }
+            .logo-container { text-align: center; margin-bottom: 4px; }
+            .logo-img { max-width: 32mm; height: auto; }
+            table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+            td { font-size: 11px; vertical-align: top; }
+          </style>
+        </head>
+        <body>
+          <div class="logo-container">
+            <img src="${urlDaLogo}" class="logo-img" alt="Logo" />
+          </div>
+          <div class="center header-title">O MUNDO DOS PERFUMES</div>
+          <div class="center" style="font-size: 10px;">SISTEMA DE GESTÃO & PDV</div>
+          <div class="divider"></div>
+          <div>DATA: ${new Date(dadosUltimaVenda.data).toLocaleString('pt-BR')}</div>
+          <div class="divider"></div>
+          <div class="bold">ITENS VENDIDOS:</div>
+          <table>
+            <tbody>
+              ${dadosUltimaVenda.itens.map((item: any) => `
+                <tr>
+                  <td>${item.quantidade}x ${item.nome.substring(0, 16)}</td>
+                  <td class="right">R$ ${(item.quantidade * item.precoVenda).toFixed(2)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <div class="divider"></div>
+          <div class="right bold" style="font-size: 13px;">TOTAL: R$ ${dadosUltimaVenda.total.toFixed(2)}</div>
+          <div class="divider"></div>
+          <div class="center bold" style="margin-top: 8px;">OBRIGADO PELA PREFERÊNCIA!</div>
+          <div class="center">VOLTE SEMPRE ✨</div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            }
+          </script>
+        </body>
+      </html>
+    `);
+    popup.document.close();
+  };
+
+  const handleFecharCaixa = async () => {
+    if(confirm('Tem certeza que deseja fechar o caixa do dia?')) {
+      await fecharCaixa(caixa.id, caixa.saldoInicial + totalCompra);
+      setCaixa(null);
+    }
+  };
 
   if (carregando) return <div className="p-8 text-center text-[#6A283A] font-bold">Carregando Caixa...</div>;
 
-  // ... (Telas de Caixa Fechado e Venda Sucesso se mantêm iguais ao código anterior)
+  if (!caixa) {
+    return (
+      <div className="max-w-md mx-auto mt-10 md:mt-20 bg-white p-6 md:p-8 rounded-xl shadow-xl border border-[#E0DDDD] text-center">
+        <div className="text-5xl mb-4 animate-pulse">🔒</div>
+        <h2 className="text-2xl font-black text-[#6A283A] mb-2">Caixa Fechado</h2>
+        <p className="text-zinc-500 mb-6 font-medium text-sm md:text-base">Para começar a vender, precisamos abrir o caixa informando o troco inicial.</p>
+        <form action={abrirCaixa} onSubmit={() => setTimeout(() => window.location.reload(), 1000)}>
+          <label className="block text-left text-sm font-bold text-[#6A283A] mb-2">Troco/Saldo Inicial (R$)</label>
+          <input name="saldoInicial" type="number" step="0.01" defaultValue="0" required className="w-full p-3 border border-[#E0DDDD] bg-[#E0DDDD]/10 focus:ring-[#6A283A] focus:border-[#6A283A] rounded-lg mb-6 outline-none transition-all text-center text-xl font-bold" />
+          <button type="submit" className="w-full bg-[#6A283A] text-white font-black py-3 md:py-4 px-4 rounded-lg hover:bg-[#521e2d] transition-all uppercase tracking-wide shadow-md flex justify-center items-center gap-2">
+            <span>🔑</span> Abrir Caixa
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  if (vendaSucesso) {
+    return (
+      <div className="max-w-md mx-auto mt-10 md:mt-20 bg-white p-8 rounded-2xl shadow-xl border border-green-200 text-center animate-in fade-in zoom-in duration-300">
+        <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 border border-green-200 animate-bounce">
+          ✓
+        </div>
+        <h2 className="text-2xl font-black text-green-800 uppercase tracking-wide">Venda Finalizada!</h2>
+        <p className="text-zinc-600 font-medium text-sm mt-2 mb-6">O estoque já foi atualizado e os valores foram computados no caixa do dia.</p>
+        
+        <div className="space-y-3">
+          <button 
+            onClick={dispararImpressaoTermica}
+            className="w-full bg-[#6A283A] text-white font-black py-4 px-4 rounded-xl hover:bg-[#521e2d] transition-all uppercase tracking-wider shadow-md flex justify-center items-center gap-2 text-base active:scale-95"
+          >
+            🖨️ Imprimir Recibo Personalizado
+          </button>
+          
+          <button 
+            onClick={() => setVendaSucesso(false)}
+            className="w-full bg-zinc-100 text-zinc-700 font-bold py-3 px-4 rounded-xl hover:bg-zinc-200 transition-all uppercase tracking-wide text-sm active:scale-95"
+          >
+            🛒 Iniciar Próxima Venda
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full space-y-4 md:space-y-6">
       
-      {/* 🚀 BARRA DE BUSCA E LEITURA DE CÓDIGO DE BARRAS */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E0DDDD] flex gap-3">
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E0DDDD] flex flex-col md:flex-row gap-3">
         <input 
           ref={inputBuscaRef}
           type="text"
@@ -125,18 +245,17 @@ export default function CaixaPage() {
             }
           }}
           placeholder="Bipe o código de barras ou digite o nome e aperte Enter..."
-          className="flex-1 p-3 md:p-4 border border-[#E0DDDD] rounded-lg focus:ring-[#6A283A] focus:border-[#6A283A] outline-none bg-zinc-50 font-bold text-lg"
+          className="flex-1 p-3 md:p-4 border border-[#E0DDDD] rounded-lg focus:ring-[#6A283A] focus:border-[#6A283A] outline-none bg-zinc-50 font-bold text-sm md:text-lg"
           autoFocus
         />
         <button 
           onClick={() => setCameraAberta(true)}
-          className="bg-zinc-800 text-white px-6 rounded-lg font-bold hover:bg-black transition-colors flex items-center gap-2 shadow-md"
+          className="bg-zinc-800 text-white px-6 py-3 md:py-0 rounded-lg font-bold hover:bg-black transition-colors flex items-center justify-center gap-2 shadow-md w-full md:w-auto"
         >
-          📷 <span className="hidden md:inline">Ler com Celular</span>
+          📷 <span>Ler com Celular</span>
         </button>
       </div>
 
-      {/* Modal da Câmera do Celular */}
       {cameraAberta && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
           <div className="bg-white p-4 rounded-xl w-full max-w-md shadow-2xl">
@@ -150,7 +269,6 @@ export default function CaixaPage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 h-full">
-        {/* Catálogo de Produtos Visual (Mantido para toque) */}
         <div className="lg:col-span-2 bg-white p-4 md:p-6 rounded-xl shadow-sm border border-[#E0DDDD]">
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-6 border-b border-[#E0DDDD]/50 pb-4">
             <h2 className="text-xl md:text-2xl font-black text-[#6A283A]">Catálogo Rápido</h2>
@@ -175,7 +293,6 @@ export default function CaixaPage() {
           </div>
         </div>
 
-        {/* Cupom de Venda com Moeda Formatada */}
         <div className="bg-[#6A283A] text-white p-4 md:p-6 rounded-xl shadow-2xl flex flex-col h-auto lg:h-[calc(100vh-16rem)] lg:sticky lg:top-8 border border-[#521e2d] mt-2 lg:mt-0 relative overflow-hidden">
           <h2 className="text-lg md:text-xl font-black border-b border-white/20 pb-4 mb-4 text-[#EED9D4] uppercase flex items-center justify-between">
             Cupom de Venda
