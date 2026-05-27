@@ -9,12 +9,9 @@ export default function DashboardLayout({
   return (
     <div className="flex min-h-screen bg-[#E0DDDD]/20">
       
-      {/* Sidebar - Menu Lateral (Cor principal Vinho) */}
       <aside className="w-64 bg-[#6A283A] text-white flex flex-col justify-between p-4 shadow-2xl z-10">
         <div>
-          {/* Área da Logo na Sidebar Corrigida */}
           <div className="mb-6 px-2 py-6 border-b border-[#EED9D4]/20 flex flex-col items-center rounded-xl">
-            {/* Removemos o fundo branco e o formato redondo, deixando a imagem livre */}
             <div className="relative w-full h-24 mb-1">
               <Image 
                 src="/logo.png" 
@@ -28,31 +25,29 @@ export default function DashboardLayout({
             </p>
           </div>
 
-          {/* Links de Navegação */}
           <nav className="space-y-2 mt-4">
             <Link href="/dashboard" className="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-bold hover:bg-[#EED9D4] hover:text-[#6A283A] transition-all text-white/90">
               <span className="text-lg">📊</span><span>Painel Geral</span>
             </Link>
-
             <Link href="/dashboard/caixa" className="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-bold hover:bg-[#EED9D4] hover:text-[#6A283A] transition-all text-white/90">
               <span className="text-lg">💰</span><span>Caixa / PDV</span>
             </Link>
-
             <Link href="/dashboard/produtos" className="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-bold hover:bg-[#EED9D4] hover:text-[#6A283A] transition-all text-white/90">
               <span className="text-lg">🛍️</span><span>Produtos & Estoque</span>
             </Link>
-
             <Link href="/dashboard/clientes" className="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-bold hover:bg-[#EED9D4] hover:text-[#6A283A] transition-all text-white/90">
               <span className="text-lg">👥</span><span>Clientes</span>
             </Link>
-
             <Link href="/dashboard/vendedores" className="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-bold hover:bg-[#EED9D4] hover:text-[#6A283A] transition-all text-white/90">
               <span className="text-lg">👔</span><span>Vendedores</span>
+            </Link>
+            {/* NOVO LINK AQUI */}
+            <Link href="/dashboard/fornecedores" className="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-bold hover:bg-[#EED9D4] hover:text-[#6A283A] transition-all text-white/90">
+              <span className="text-lg">🚚</span><span>Fornecedores</span>
             </Link>
           </nav>
         </div>
 
-        {/* Rodapé da Sidebar - Botão Sair */}
         <div className="pt-4 border-t border-[#EED9D4]/20 mt-4">
           <Link href="/" className="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-bold bg-black/20 text-[#EED9D4] hover:bg-red-600 hover:text-white transition-all shadow-inner">
             <span className="text-lg">🚪</span><span>Sair do Sistema</span>
@@ -60,7 +55,6 @@ export default function DashboardLayout({
         </div>
       </aside>
 
-      {/* Conteúdo Principal */}
       <main className="flex-1 p-8 overflow-y-auto">
         {children}
       </main>
