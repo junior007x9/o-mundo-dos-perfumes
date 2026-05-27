@@ -9,7 +9,6 @@ export default function CaixaPage() {
   const [carrinho, setCarrinho] = useState<any[]>([]);
   const [carregando, setCarregando] = useState(true);
   
-  // Controle do recibo térmico pós-venda
   const [vendaSucesso, setVendaSucesso] = useState<boolean>(false);
   const [dadosUltimaVenda, setDadosUltimaVenda] = useState<any>(null);
 
@@ -31,7 +30,7 @@ export default function CaixaPage() {
     }
     const itemExistente = carrinho.find((item) => item.id === produto.id);
     if (itemExistente) {
-      setCarrinho(carrinho.map(item => item.id === produto.id ? { ...item, quantidade: item.quantidade + 1 } : item));
+      setCarrinho(carrinho.map(item => item.id === produto.id ? { ...item, grandfather: item.quantidade + 1 } : item));
     } else {
       setCarrinho([...carrinho, { ...produto, quantidade: 1 }]);
     }
@@ -46,7 +45,6 @@ export default function CaixaPage() {
   const handleFinalizarVenda = async () => {
     if (carrinho.length === 0) return;
     
-    // Salva cópia local para a impressora antes de limpar o carrinho
     setDadosUltimaVenda({
       itens: [...carrinho],
       total: totalCompra,
@@ -55,13 +53,13 @@ export default function CaixaPage() {
 
     await finalizarVenda(caixa.id, carrinho, totalCompra);
     setCarrinho([]);
-    setVendaSucesso(true); // Abre a tela de sucesso da impressão
+    setVendaSucesso(true);
 
     const novaLista = await getProdutosPDV();
     setProdutos(novaLista);
   };
 
-  // 🚀 IMPRESSÃO TÉRMICA DIRETAMENTE PARA A BOBINA (58mm / 80mm)
+  // 🚀 IMPRESSÃO TÉRMICA PERSONALIZADA COM SUA LOGO OFICIAL
   const dispararImpressaoTermica = () => {
     if (!dadosUltimaVenda) return;
 
@@ -70,6 +68,9 @@ export default function CaixaPage() {
       alert('Por favor, autorize pop-ups para realizar a impressão do cupom!');
       return;
     }
+
+    // Pega a URL do site atual para puxar a logo perfeitamente
+    const urlDaLogo = `${window.location.origin}/logo.png`;
 
     popup.document.write(`
       <html>
@@ -84,20 +85,25 @@ export default function CaixaPage() {
               width: 58mm; 
               margin: 0; 
               color: #000; 
-              line-height: 1.2;
+              line-height: 1.3;
             }
             .center { text-align: center; }
             .right { text-align: right; }
             .bold { font-weight: bold; }
             .divider { border-bottom: 1px dashed #000; margin: 6px 0; }
-            .header-title { font-size: 14px; font-weight: bold; margin-bottom: 2px; }
+            .header-title { font-size: 13px; font-weight: bold; margin-top: 4px; margin-bottom: 2px; }
+            .logo-container { text-align: center; margin-bottom: 4px; }
+            .logo-img { max-width: 32mm; height: auto; }
             table { width: 100%; border-collapse: collapse; margin-top: 4px; }
             td { font-size: 11px; vertical-align: top; }
           </style>
         </head>
         <body>
+          <div class="logo-container">
+            <img src="${urlDaLogo}" class="logo-img" alt="Logo" />
+          </div>
           <div class="center header-title">O MUNDO DOS PERFUMES</div>
-          <div class="center">SISTEMA DE GESTÃO & PDV</div>
+          <div class="center" style="font-size: 10px;">SISTEMA DE GESTÃO & PDV</div>
           <div class="divider"></div>
           <div>DATA: ${new Date(dadosUltimaVenda.data).toLocaleString('pt-BR')}</div>
           <div class="divider"></div>
@@ -155,7 +161,6 @@ export default function CaixaPage() {
     );
   }
 
-  // 📝 TELA INTERMEDIÁRIA DE SUCESSO E IMPRESSÃO DE RECIBO
   if (vendaSucesso) {
     return (
       <div className="max-w-md mx-auto mt-10 md:mt-20 bg-white p-8 rounded-2xl shadow-xl border border-green-200 text-center animate-in fade-in zoom-in duration-300">
@@ -170,7 +175,7 @@ export default function CaixaPage() {
             onClick={dispararImpressaoTermica}
             className="w-full bg-[#6A283A] text-white font-black py-4 px-4 rounded-xl hover:bg-[#521e2d] transition-all uppercase tracking-wider shadow-md flex justify-center items-center gap-2 text-base active:scale-95"
           >
-            🖨️ Imprimir Recibo Térmico
+            🖨️ Imprimir Recibo Personalizado
           </button>
           
           <button 
@@ -186,8 +191,6 @@ export default function CaixaPage() {
 
   return (
     <div className="flex flex-col h-full space-y-4 md:space-y-6">
-      
-      {/* Assistente */}
       <div className="bg-gradient-to-r from-blue-50 to-white p-4 md:p-5 rounded-2xl border border-blue-100 shadow-sm flex flex-col md:flex-row items-start md:items-center gap-4">
         <div className="bg-blue-600 p-3 rounded-full animate-pulse shadow-lg border-2 border-white flex-shrink-0">
           <span className="text-2xl text-white">🛍️</span>
@@ -203,7 +206,6 @@ export default function CaixaPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 h-full">
-        {/* Catálogo de Produtos */}
         <div className="lg:col-span-2 bg-white p-4 md:p-6 rounded-xl shadow-sm border border-[#E0DDDD]">
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-6 border-b border-[#E0DDDD]/50 pb-4">
             <h2 className="text-xl md:text-2xl font-black text-[#6A283A]">Catálogo de Produtos</h2>
@@ -229,7 +231,6 @@ export default function CaixaPage() {
           </div>
         </div>
 
-        {/* Cupom de Venda */}
         <div className="bg-[#6A283A] text-white p-4 md:p-6 rounded-xl shadow-2xl flex flex-col h-auto lg:h-[calc(100vh-14rem)] lg:sticky lg:top-8 border border-[#521e2d] mt-2 lg:mt-0 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl"></div>
 

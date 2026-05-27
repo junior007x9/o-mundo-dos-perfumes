@@ -16,23 +16,25 @@ export default function DashboardPage() {
     carregar();
   }, []);
 
-  // 🚀 FUNÇÃO MÁGICA PARA EXPORTAR DIRETO PARA O EXCEL
+  // 🚀 EXPORTADOR PERSONALIZADO PARA O EXCEL COM SUA MARCA
   const exportarParaExcel = () => {
     if (!dados || dados.listaVendas.length === 0) return;
 
-    // Organiza os dados no formato que o Excel adora (Padrão do Excel em Português)
     const dadosFormatados = dados.listaVendas.map((v: any) => ({
       'Código do Cupom': v.id,
       'Data e Hora': new Date(v.data).toLocaleString('pt-BR'),
-      'Valor da Venda (R$)': v.total.toFixed(2).replace('.', ',') // Padrão brasileiro de moeda
+      'Valor da Venda (R$)': v.total.toFixed(2).replace('.', ',')
     }));
 
-    // Cria os cabeçalhos e as linhas separados por ponto e vírgula (;)
+    // Criando um cabeçalho de marca personalizado dentro do Excel
+    const dataEmissao = new Date().toLocaleString('pt-BR');
+    const cabecalhoEmpresa = `O MUNDO DOS PERFUMES - RELATÓRIO GERENCIAL DE VENDAS;;\nData de Emissão: ${dataEmissao};;\n;\n`;
+
     const colunas = Object.keys(dadosFormatados[0]).join(';');
     const linhas = dadosFormatados.map((row: any) => Object.values(row).join(';')).join('\n');
     
-    // O segredo do sucesso: "\uFEFF" força o Excel a abrir no formato UTF-8 correto sem bugar os acentos
-    const csvCompleto = "\uFEFF" + colunas + '\n' + linhas;
+    // Junta o cabeçalho personalizado da marca com os dados da tabela
+    const csvCompleto = "\uFEFF" + cabecalhoEmpresa + colunas + '\n' + linhas;
 
     const blob = new Blob([csvCompleto], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -102,12 +104,9 @@ export default function DashboardPage() {
 
       {/* Tabelas Inferiores */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-        
-        {/* Últimas Vendas + Botão Excel */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD]">
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-4">
             <h2 className="text-xl font-bold text-[#6A283A]">Últimas Vendas Realizadas</h2>
-            
             {dados.listaVendas.length > 0 && (
               <button 
                 onClick={exportarParaExcel}
@@ -141,7 +140,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Produtos Esgotados */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD]">
           <h2 className="text-xl font-bold text-[#6A283A] mb-4">Produtos Esgotados</h2>
           <div className="overflow-x-auto rounded-lg border border-[#E0DDDD]/60">
@@ -166,7 +164,6 @@ export default function DashboardPage() {
             </table>
           </div>
         </div>
-        
       </div>
     </div>
   );
