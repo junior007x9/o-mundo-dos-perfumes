@@ -13,7 +13,6 @@ export async function fazerLogin(formData: FormData) {
 
   if (!email || !senha) return;
 
-  // 1. Busca o usuário no banco de dados
   const usuario = await db.select().from(vendedores).where(eq(vendedores.email, email)).get();
 
   if (!usuario) {
@@ -21,7 +20,6 @@ export async function fazerLogin(formData: FormData) {
     return;
   }
 
-  // 2. Verifica se a senha está correta
   const senhaValida = await bcrypt.compare(senha, usuario.senhaHash);
 
   if (!senhaValida) {
@@ -29,21 +27,41 @@ export async function fazerLogin(formData: FormData) {
     return;
   }
 
-  // 3. Cria um cookie de sessão para manter o usuário logado
   const cookieStore = await cookies();
   cookieStore.set('usuario_logado_id', usuario.id.toString(), {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    maxAge: 60 * 60 * 24 // Duração de 1 dia
+    maxAge: 60 * 60 * 24
   });
 
-  // 4. Redireciona para o Painel de Controle
+  // Se for vendedor, manda direto para o Caixa para facilitar o trabalho dele
+  if (usuario.cargo === 'vendedor') {
+    redirect('/dashboard/caixa');
+  }
+
   redirect('/dashboard');
 }
 
-// NOVO: Função para Sair do Sistema com segurança
 export async function sairDoSistema() {
   const cookieStore = await cookies();
-  cookieStore.delete('usuario_logado_id'); // Destrói o cookie
-  redirect('/'); // Manda de volta pra tela de login
+  cookieStore.delete('usuario_logado_id');
+  redirect('/');
+}
+
+// 🚀 NOVA FUNÇÃO: Busca os dados e o cargo do usuário logado
+export async function getUsuarioLogado() {
+  const cookieStore = await cookies();
+  const idStr = cookieStore.get('usuario_logado_id')?.value;
+  
+  if (!idStr) return null;
+  
+  const id = Number(idStr);
+  const usuario = await db.select().from(vendedores).where(eq(vendedores.id, id)).get();
+  
+  if (!usuario) return null;
+  
+  return {
+    nome: usuario.nome,
+    cargo: usuario.cargo // 'admin' ou 'vendedor'
+  };
 }
