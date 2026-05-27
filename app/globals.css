@@ -1,26 +1,22 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
+/* 1. Força o sistema a ignorar o "Dark Mode" do aparelho, mantendo a nossa identidade visual */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  /* 2. Garante que TODO campo de texto no sistema tenha a cor escura e bem legível */
+  input, select, textarea {
+    color: #18181b !important; /* Cor bem escura (zinc-900) */
+    font-weight: 600 !important; /* Deixa a letra um pouco mais grossa */
   }
-}
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* 3. Deixa o texto de "dica" (ex: "Ex: Carolina Herrera") mais claro para não confundir com o que foi digitado */
+  input::placeholder, select::placeholder, textarea::placeholder {
+    color: #a1a1aa !important; /* Cor cinza média (zinc-400) */
+    font-weight: 400 !important;
+  }
 }
