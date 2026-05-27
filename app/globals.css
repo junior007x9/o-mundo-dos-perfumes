@@ -2,21 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 1. Força o sistema a ignorar o "Dark Mode" do aparelho, mantendo a nossa identidade visual */
+/* 1. Restaurando as variáveis vitais de funcionamento do Next.js */
 :root {
-  color-scheme: light;
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
 }
 
-@layer base {
-  /* 2. Garante que TODO campo de texto no sistema tenha a cor escura e bem legível */
-  input, select, textarea {
-    color: #18181b !important; /* Cor bem escura (zinc-900) */
-    font-weight: 600 !important; /* Deixa a letra um pouco mais grossa */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 0, 0, 0;
+    --background-start-rgb: 214, 219, 220;
+    --background-end-rgb: 255, 255, 255;
   }
+}
 
-  /* 3. Deixa o texto de "dica" (ex: "Ex: Carolina Herrera") mais claro para não confundir com o que foi digitado */
-  input::placeholder, select::placeholder, textarea::placeholder {
-    color: #a1a1aa !important; /* Cor cinza média (zinc-400) */
-    font-weight: 400 !important;
-  }
+body {
+  color: rgb(var(--foreground-rgb));
+  background: transparent;
+}
+
+/* 2. Nossa correção para os textos de digitação ficarem 100% visíveis */
+input, select, textarea {
+  color: #18181b !important; /* Força o texto a ficar quase preto (zinc-900) */
+  color-scheme: light; /* Impede que o celular inverta as cores das caixas de texto no modo escuro */
+}
+
+input::placeholder, select::placeholder, textarea::placeholder {
+  color: #a1a1aa !important; /* Deixa o texto de exemplo cinza médio */
 }
