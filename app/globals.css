@@ -1,33 +1,37 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-/* 1. Restaurando as variáveis vitais de funcionamento do Next.js */
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --foreground-rgb: 0, 0, 0;
-    --background-start-rgb: 214, 219, 220;
-    --background-end-rgb: 255, 255, 255;
+    --background: #0a0a0a;
+    --foreground: #ededed;
   }
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: transparent;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
 }
 
-/* 2. Nossa correção para os textos de digitação ficarem 100% visíveis */
+/* --- CORREÇÃO DO TEXTO TRANSPARENTE DOS CAMPOS --- */
 input, select, textarea {
-  color: #18181b !important; /* Força o texto a ficar quase preto (zinc-900) */
-  color-scheme: light; /* Impede que o celular inverta as cores das caixas de texto no modo escuro */
+  color: #18181b !important; /* Força o texto digitado a ficar escuro */
+  font-weight: 600 !important; /* Deixa a letra um pouco mais visível */
+  color-scheme: light !important; /* Impede que o celular deixe o campo escuro por dentro */
 }
 
 input::placeholder, select::placeholder, textarea::placeholder {
-  color: #a1a1aa !important; /* Deixa o texto de exemplo cinza médio */
+  color: #a1a1aa !important; /* Texto de dica em cinza claro */
 }
