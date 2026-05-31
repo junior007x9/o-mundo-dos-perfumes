@@ -15,7 +15,7 @@ export const produtos = sqliteTable('produtos', {
   precoCusto: real('preco_custo').notNull(),
   precoVenda: real('preco_venda').notNull(),
   estoque: integer('estoque').notNull().default(0),
-  codigoBarras: text('codigo_barras'), // 🚀 NOVO CAMPO ADICIONADO AQUI
+  codigoBarras: text('codigo_barras'),
 });
 
 export const clientes = sqliteTable('clientes', {
@@ -35,11 +35,14 @@ export const caixas = sqliteTable('caixas', {
   status: text('status').notNull().default('aberto'),
 });
 
+/* 🚀 TABELA ATUALIZADA: Agora aceita PIX/Cartão e Status de Cancelamento */
 export const vendas = sqliteTable('vendas', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   idCaixa: integer('id_caixa').notNull(),
   total: real('total').notNull(),
   data: text('data').notNull(),
+  formaPagamento: text('forma_pagamento').default('dinheiro'), 
+  status: text('status').notNull().default('concluida'),
 });
 
 export const itensVenda = sqliteTable('itens_venda', {
