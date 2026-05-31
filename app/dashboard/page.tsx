@@ -1,120 +1,204 @@
 'use client';
 
-import { useState } from 'react';
-import { db } from '@/db';
-import { produtos } from '@/db/schema';
-import { desc } from 'drizzle-orm';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { getDadosDashboard, cancelarVendaAction } from './dashboardActions';
 
-export default function ProdutosPage() {
-  const router = useRouter();
+export default function DashboardPage() {
+  const [dados, setDados] = useState<any>(null);
+  const [carregando, setCarregando] = useState(true);
 
-  // Função para aplicar a Máscara de Dinheiro (R$ 0,00)
-  const aplicarMascaraMoeda = (e: any) => {
-    let valor = e.target.value.replace(/\D/g, ''); // Remove tudo que não é número
-    valor = (Number(valor) / 100).toFixed(2) + '';
-    valor = valor.replace('.', ',');
-    valor = valor.replace(/(\d)(\d{3})(\d{3}),/g, "$1.$2.$3,");
-    valor = valor.replace(/(\d)(\d{3}),/g, "$1.$2,");
-    e.target.value = valor === '0,00' ? '' : valor;
+  useEffect(() => {
+    carregar();
+  }, []);
+
+  async function carregar() {
+    setCarregando(true);
+    const res = await getDadosDashboard();
+    setDados(res);
+    setCarregando(false);
+  }
+
+  const handleEstornarVenda = async (idVenda: number) => {
+    if(confirm('ATENÇÃO: Deseja realmente cancelar esta venda?\n\nO valor será subtraído do faturamento e os produtos voltarão automaticamente para o estoque.')) {
+      await cancelarVendaAction(idVenda);
+      alert('Venda estornada com sucesso!');
+      carregar(); // Recarrega os dados para atualizar a tela
+    }
   };
 
-  const formataMoeda = (valor: number) => {
-    return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const exportarParaExcel = () => {
+    if (!dados || dados.listaVendas.length === 0) return;
+
+    const dadosFormatados = dados.listaVendas.map((v: any) => ({
+      'Código do Cupom': v.id,
+      'Data e Hora': new Date(v.data).toLocaleString('pt-BR'),
+      'Pagamento': v.formaPagamento ? v.formaPagamento.toUpperCase() : 'DINHEIRO',
+      'Status': v.status ? v.status.toUpperCase() : 'CONCLUÍDA',
+      'Valor da Venda (R$)': v.total.toFixed(2).replace('.', ',')
+    }));
+
+    const dataEmissao = new Date().toLocaleString('pt-BR');
+    const cabecalhoEmpresa = `O MUNDO DOS PERFUMES - RELATÓRIO GERENCIAL DE VENDAS;;\nData de Emissão: ${dataEmissao};;\n;\n`;
+
+    const colunas = Object.keys(dadosFormatados[0]).join(';');
+    const linhas = dadosFormatados.map((row: any) => Object.values(row).join(';')).join('\n');
+    
+    const csvCompleto = "\uFEFF" + cabecalhoEmpresa + colunas + '\n' + linhas;
+
+    const blob = new Blob([csvCompleto], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `relatorio_vendas_mundo_perfumes_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
+
+  if (carregando) return <div className="p-8 text-center text-[#6A283A] font-bold animate-pulse">Carregando Painel Geral...</div>;
+
+  const dataHoje = new Date().toISOString().split('T')[0];
+  
+  // 🚀 O SISTEMA AGORA IGNORA VENDAS CANCELADAS NA HORA DE SOMAR OS LUCROS
+  const vendasValidas = dados.listaVendas.filter((v: any) => v.status !== 'cancelada');
+  const vendasHoje = vendasValidas.filter((v: any) => v.data.startsWith(dataHoje));
+  const totalVendidoHoje = vendasHoje.reduce((acc: number, v: any) => acc + v.total, 0);
+  const totalVendidoSempre = vendasValidas.reduce((acc: number, v: any) => acc + v.total, 0);
+  
+  const produtosBaixoEstoque = dados.listaProdutos.filter((p: any) => p.estoque > 0 && p.estoque <= 5);
+  const produtosSemEstoque = dados.listaProdutos.filter((p: any) => p.estoque === 0);
 
   return (
     <div className="space-y-6 md:space-y-8">
       
-      <div className="bg-gradient-to-r from-amber-50 to-white p-4 md:p-5 rounded-2xl border border-amber-200 shadow-sm flex flex-col md:flex-row items-start md:items-center gap-4">
-        <div className="bg-amber-500 p-3 rounded-full animate-bounce shadow-lg border-2 border-white flex-shrink-0">
-          <span className="text-2xl text-white">📦</span>
+      <div className="bg-gradient-to-r from-[#EED9D4]/40 to-white p-5 rounded-2xl border border-[#6A283A]/20 shadow-sm flex flex-col sm:flex-row items-start sm:items-center gap-4 transition-all hover:shadow-md">
+        <div className="bg-[#6A283A] p-3 rounded-full animate-bounce shadow-lg border-2 border-white flex-shrink-0">
+          <span className="text-2xl">🛡️</span>
         </div>
-        <div className="flex-1">
-          <h3 className="font-black text-amber-900 text-lg uppercase tracking-wide">Novidade no Estoque!</h3>
-          <p className="text-amber-800/80 text-sm mt-1 font-medium leading-relaxed">
-            Agora você pode bipar o <strong>Código de Barras</strong> ao cadastrar o perfume! Na hora da venda, basta usar o leitor ou a câmera do celular para o produto ir direto pro carrinho. E os valores já estão formatados em Reais (R$).
+        <div>
+          <h3 className="font-black text-[#6A283A] text-lg uppercase tracking-wide">Controle Total Ativado!</h3>
+          <p className="text-zinc-600 text-sm mt-1 font-medium leading-relaxed">
+            Seu relatório agora rastreia <strong>PIX, Cartão e Dinheiro</strong>. Além disso, se houver qualquer erro no caixa, você pode usar o botão de <strong>Estorno</strong> na tabela abaixo para cancelar a venda e devolver os produtos ao estoque.
           </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-[#6A283A] transition-transform hover:scale-105">
+          <h3 className="text-xs md:text-sm font-bold text-zinc-500 uppercase tracking-wider">Vendas de Hoje</h3>
+          <p className="text-2xl md:text-3xl font-black text-[#6A283A] mt-2">R$ {totalVendidoHoje.toFixed(2)}</p>
+          <p className="text-xs text-zinc-400 mt-2">{vendasHoje.length} venda(s) válida(s)</p>
+        </div>
+
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-green-600 transition-transform hover:scale-105">
+          <h3 className="text-xs md:text-sm font-bold text-zinc-500 uppercase tracking-wider">Faturamento Total</h3>
+          <p className="text-2xl md:text-3xl font-black text-green-600 mt-2">R$ {totalVendidoSempre.toFixed(2)}</p>
+          <p className="text-xs text-zinc-400 mt-2">Líquido de cancelamentos</p>
+        </div>
+
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-blue-500 transition-transform hover:scale-105">
+          <h3 className="text-xs md:text-sm font-bold text-zinc-500 uppercase tracking-wider">Total de Clientes</h3>
+          <p className="text-2xl md:text-3xl font-black text-zinc-800 mt-2">{dados.listaClientes.length}</p>
+          <p className="text-xs text-zinc-400 mt-2">Na base de dados</p>
+        </div>
+
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-red-500 transition-transform hover:scale-105">
+          <h3 className="text-xs md:text-sm font-bold text-zinc-500 uppercase tracking-wider">Estoque Crítico</h3>
+          <p className="text-2xl md:text-3xl font-black text-red-600 mt-2">{produtosSemEstoque.length}</p>
+          <p className="text-xs text-red-400 font-medium mt-2">{produtosBaixoEstoque.length} produto(s) acabando</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         
-        {/* Formulário */}
-        <div className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-[#E0DDDD] h-fit lg:sticky lg:top-8 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1.5 bg-[#6A283A]"></div>
+        {/* Histórico de Vendas Completo */}
+        <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD]">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-4">
+            <h2 className="text-xl font-bold text-[#6A283A]">Histórico de Vendas</h2>
+            {dados.listaVendas.length > 0 && (
+              <button 
+                onClick={exportarParaExcel}
+                className="bg-green-700 text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-green-800 transition-all flex items-center justify-center gap-2 active:scale-95 shadow-sm uppercase tracking-wider"
+              >
+                📥 Exportar Excel
+              </button>
+            )}
+          </div>
           
-          <h2 className="text-xl font-black text-[#6A283A] mb-6 flex items-center gap-2">
-            <span>➕</span> Cadastrar Perfume
-          </h2>
-          
-          <form 
-            onSubmit={async (e) => {
-              e.preventDefault();
-              const formData = new FormData(e.currentTarget);
-              
-              // Transforma a string com vírgula de volta para número do banco de dados
-              const parseMoeda = (val: string) => Number(val.replace(/\./g, '').replace(',', '.'));
-
-              const dados = {
-                nome: formData.get('nome') as string,
-                descricao: formData.get('descricao') as string,
-                codigoBarras: formData.get('codigoBarras') as string,
-                precoCusto: parseMoeda(formData.get('precoCusto') as string),
-                precoVenda: parseMoeda(formData.get('precoVenda') as string),
-                estoque: Number(formData.get('estoque')),
-              };
-
-              // Chama a API para salvar (vamos fazer no cliente por simplicidade de import)
-              await fetch('/api/produtos', { method: 'POST', body: JSON.stringify(dados) });
-              router.refresh(); // Atualiza a página
-              (e.target as HTMLFormElement).reset(); // Limpa o formulário
-            }} 
-            className="space-y-4 md:space-y-5"
-          >
-            <div>
-              <label className="block text-xs md:text-sm font-bold text-[#6A283A] mb-1">Código de Barras (Opcional)</label>
-              <input name="codigoBarras" className="w-full p-3 border border-[#E0DDDD] rounded-lg focus:ring-[#6A283A] focus:border-[#6A283A] outline-none bg-[#E0DDDD]/10 transition-all focus:bg-white text-sm" placeholder="Bipe aqui ou digite" />
-            </div>
-
-            <div>
-              <label className="block text-xs md:text-sm font-bold text-[#6A283A] mb-1">Nome do Perfume</label>
-              <input name="nome" required className="w-full p-3 border border-[#E0DDDD] rounded-lg focus:ring-[#6A283A] focus:border-[#6A283A] outline-none bg-[#E0DDDD]/10 transition-all focus:bg-white text-sm" placeholder="Ex: 212 VIP Rose" />
-            </div>
-            
-            <div>
-              <label className="block text-xs md:text-sm font-bold text-[#6A283A] mb-1">Descrição / Marca</label>
-              <input name="descricao" className="w-full p-3 border border-[#E0DDDD] rounded-lg focus:ring-[#6A283A] focus:border-[#6A283A] outline-none bg-[#E0DDDD]/10 transition-all focus:bg-white text-sm" placeholder="Ex: Carolina Herrera - 100ml" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 md:gap-4">
-              <div>
-                <label className="block text-xs md:text-sm font-bold text-[#6A283A] mb-1">Custo</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-3 text-zinc-500 font-bold">R$</span>
-                  <input name="precoCusto" type="text" onChange={aplicarMascaraMoeda} required className="w-full pl-9 p-3 border border-[#E0DDDD] rounded-lg focus:ring-[#6A283A] focus:border-[#6A283A] outline-none bg-[#E0DDDD]/10 transition-all focus:bg-white text-sm" placeholder="0,00" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs md:text-sm font-bold text-[#6A283A] mb-1">Venda</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-3 text-zinc-500 font-bold">R$</span>
-                  <input name="precoVenda" type="text" onChange={aplicarMascaraMoeda} required className="w-full pl-9 p-3 border border-[#E0DDDD] rounded-lg focus:ring-[#6A283A] focus:border-[#6A283A] outline-none bg-[#E0DDDD]/10 transition-all focus:bg-white text-sm" placeholder="0,00" />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs md:text-sm font-bold text-[#6A283A] mb-1">Qtd. Inicial (Estoque)</label>
-              <input name="estoque" type="number" required className="w-full p-3 border border-[#E0DDDD] rounded-lg focus:ring-[#6A283A] focus:border-[#6A283A] outline-none bg-[#E0DDDD]/10 transition-all focus:bg-white text-sm" placeholder="Ex: 10" />
-            </div>
-
-            <button type="submit" className="w-full mt-4 bg-[#6A283A] text-white font-black py-3 md:py-4 px-4 rounded-lg hover:bg-[#521e2d] transition-all shadow-md uppercase tracking-wide flex justify-center items-center gap-2 active:scale-95 text-sm md:text-base">
-              Salvar no Estoque
-            </button>
-          </form>
+          <div className="overflow-x-auto rounded-lg border border-[#E0DDDD]/60">
+            <table className="w-full text-left whitespace-nowrap">
+              <thead>
+                <tr className="bg-zinc-50 border-b border-[#E0DDDD]">
+                  <th className="p-3 text-xs font-bold text-zinc-600">Data</th>
+                  <th className="p-3 text-xs font-bold text-zinc-600">Valor</th>
+                  <th className="p-3 text-xs font-bold text-zinc-600">Pagamento</th>
+                  <th className="p-3 text-xs font-bold text-zinc-600">Status</th>
+                  <th className="p-3 text-xs font-bold text-zinc-600 text-right">Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dados.listaVendas.slice(0, 8).map((venda: any) => (
+                  <tr key={venda.id} className={`border-b border-[#E0DDDD]/50 transition-colors ${venda.status === 'cancelada' ? 'bg-red-50/50' : 'hover:bg-[#EED9D4]/20'}`}>
+                    <td className="p-3 text-sm text-zinc-600">{new Date(venda.data).toLocaleString('pt-BR')}</td>
+                    <td className={`p-3 text-sm font-black ${venda.status === 'cancelada' ? 'text-zinc-400 line-through' : 'text-green-600'}`}>
+                      R$ {venda.total.toFixed(2)}
+                    </td>
+                    <td className="p-3 text-xs font-bold text-zinc-500 uppercase">
+                      {venda.formaPagamento || 'Dinheiro'}
+                    </td>
+                    <td className="p-3">
+                      {venda.status === 'cancelada' ? (
+                        <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-[10px] font-black uppercase">Cancelada</span>
+                      ) : (
+                        <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-black uppercase">Concluída</span>
+                      )}
+                    </td>
+                    <td className="p-3 text-right">
+                      {venda.status !== 'cancelada' && (
+                        <button 
+                          onClick={() => handleEstornarVenda(venda.id)}
+                          className="text-xs bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded hover:bg-red-600 hover:text-white transition-colors font-bold shadow-sm"
+                        >
+                          Estornar
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {dados.listaVendas.length === 0 && (
+                  <tr><td colSpan={5} className="p-4 text-center text-zinc-500 text-sm">Nenhuma venda registrada ainda.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
+        {/* Produtos Esgotados */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD]">
+          <h2 className="text-xl font-bold text-[#6A283A] mb-4">Esgotados</h2>
+          <div className="overflow-x-auto rounded-lg border border-[#E0DDDD]/60">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-zinc-50 border-b border-[#E0DDDD]">
+                  <th className="p-3 text-xs font-bold text-zinc-600">Produto</th>
+                  <th className="p-3 text-xs font-bold text-zinc-600">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {produtosSemEstoque.map((produto: any) => (
+                  <tr key={produto.id} className="border-b border-[#E0DDDD]/50 hover:bg-red-50 transition-colors">
+                    <td className="p-3 text-sm font-bold text-zinc-800 line-clamp-1">{produto.nome}</td>
+                    <td className="p-3 text-sm font-black text-red-600">Esgotado</td>
+                  </tr>
+                ))}
+                {produtosSemEstoque.length === 0 && (
+                  <tr><td colSpan={2} className="p-4 text-center text-zinc-500 text-sm">Estoque seguro! 🎉</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
       </div>
     </div>
   );

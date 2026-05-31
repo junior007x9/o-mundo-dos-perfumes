@@ -17,6 +17,10 @@ export default function CaixaPage() {
   const [cameraAberta, setCameraAberta] = useState(false);
   const inputBuscaRef = useRef<HTMLInputElement>(null);
 
+  // 🚀 NOVOS ESTADOS PARA O PAGAMENTO
+  const [pagamento, setPagamento] = useState('dinheiro');
+  const [valorRecebido, setValorRecebido] = useState<number | string>('');
+
   useEffect(() => {
     async function carregarDados() {
       const caixaAtual = await getCaixaAberto();
@@ -28,7 +32,6 @@ export default function CaixaPage() {
     carregarDados();
   }, []);
 
-  // CORREÇÃO: O TypeScript agora aceita a função de desligar a câmera perfeitamente
   useEffect(() => {
     if (cameraAberta) {
       const scanner = new Html5QrcodeScanner(
@@ -42,7 +45,6 @@ export default function CaixaPage() {
         processarBuscaProduto(codigoLido);
       }, () => {});
       
-      // Envelopamos o fechamento para não retornar uma Promise
       return () => {
         scanner.clear().catch(error => console.error("Falha ao limpar scanner", error));
       };
@@ -93,10 +95,28 @@ export default function CaixaPage() {
 
   const handleFinalizarVenda = async () => {
     if (carrinho.length === 0) return;
-    setDadosUltimaVenda({ itens: [...carrinho], total: totalCompra, data: new Date().toISOString() });
+    
+    // Trava de segurança para não fechar venda em dinheiro sem receber o valor correto
+    if (pagamento === 'dinheiro' && Number(valorRecebido) < totalCompra) {
+      alert('O valor recebido é menor que o total da compra!');
+      return;
+    }
+
+    setDadosUltimaVenda({ 
+      itens: [...carrinho], 
+      total: totalCompra, 
+      data: new Date().toISOString(),
+      pagamento: pagamento // Salva a forma de pagamento para o recibo
+    });
+    
+    // Enviando a venda para o banco (Se você for atualizar a action depois, pode passar o pagamento aqui)
     await finalizarVenda(caixa.id, carrinho, totalCompra);
+    
     setCarrinho([]);
+    setValorRecebido('');
+    setPagamento('dinheiro');
     setVendaSucesso(true);
+    
     const novaLista = await getProdutosPDV();
     setProdutos(novaLista);
   };
@@ -160,6 +180,7 @@ export default function CaixaPage() {
           </table>
           <div class="divider"></div>
           <div class="right bold" style="font-size: 13px;">TOTAL: R$ ${dadosUltimaVenda.total.toFixed(2)}</div>
+          <div class="bold" style="margin-top: 4px; font-size: 11px;">PAGAMENTO: ${dadosUltimaVenda.pagamento.toUpperCase()}</div>
           <div class="divider"></div>
           <div class="center bold" style="margin-top: 8px;">OBRIGADO PELA PREFERÊNCIA!</div>
           <div class="center">VOLTE SEMPRE ✨</div>
@@ -283,7 +304,7 @@ export default function CaixaPage() {
                 key={p.id} 
                 onClick={() => adicionarAoCarrinho(p)}
                 disabled={p.estoque <= 0}
-                className={`group relative p-3 md:p-4 border rounded-xl text-left transition-all overflow-hidden ${p.estoque > 0 ? 'border-[#E0DDDD] hover:border-[#6A283A] hover:shadow-md bg-white hover:bg-[#EED9D4]/10' : 'opacity-50 bg-zinc-50 border-zinc-200 cursor-not-allowed'}`}
+                className={`group relative p-3 md:p-4 border rounded-xl text-left transition-all overflow-hidden ${p.estoque > 0 ? 'border-[#E0DDDD] hover:border-[#6A283A] hover:shadow-md bg-white hover:bg-[#EED9D4]/10 active:scale-95' : 'opacity-50 bg-zinc-50 border-zinc-200 cursor-not-allowed'}`}
               >
                 <h3 className="font-bold text-zinc-900 text-sm md:text-base line-clamp-2">{p.nome}</h3>
                 <p className="text-[10px] md:text-xs font-medium text-zinc-500 mt-1">Estoque: {p.estoque}</p>
@@ -308,19 +329,63 @@ export default function CaixaPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="font-black text-white text-sm md:text-base">{formataMoeda(item.quantidade * item.precoVenda)}</span>
-                  <button onClick={() => removerDoCarrinho(item.id)} className="text-[#EED9D4] bg-white/5 rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-500">✖</button>
+                  <button onClick={() => removerDoCarrinho(item.id)} className="text-[#EED9D4] bg-white/5 rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-500 transition-colors">✖</button>
                 </div>
               </div>
             ))}
           </div>
 
           <div className="border-t border-white/20 pt-4 mt-4">
-            <div className="flex justify-between items-end mb-6 bg-black/20 p-4 rounded-xl border border-white/5">
+            <div className="flex justify-between items-end mb-4 bg-black/20 p-4 rounded-xl border border-white/5">
               <span className="text-[#EED9D4] font-bold text-xs md:text-sm uppercase">Total a Pagar</span>
               <span className="text-2xl md:text-3xl font-black text-white">{formataMoeda(totalCompra)}</span>
             </div>
 
-            <button onClick={handleFinalizarVenda} disabled={carrinho.length === 0} className="w-full bg-[#EED9D4] text-[#6A283A] font-black py-4 rounded-xl hover:bg-white disabled:opacity-50 mb-3 uppercase tracking-wider text-sm md:text-base">
+            {/* 🚀 NOVA ÁREA DE SELEÇÃO DE PAGAMENTO E CÁLCULO DE TROCO */}
+            <div className="bg-black/20 p-4 rounded-xl space-y-4 border border-white/5 mb-4">
+              <label className="text-xs font-bold text-[#EED9D4] uppercase block">Forma de Pagamento</label>
+              <select 
+                value={pagamento}
+                onChange={(e) => {
+                  setPagamento(e.target.value);
+                  setValorRecebido('');
+                }}
+                className="w-full p-3 rounded-lg bg-white/10 text-white font-bold border border-white/20 outline-none focus:border-[#EED9D4] transition-all"
+              >
+                <option value="dinheiro" className="text-black">💵 Dinheiro</option>
+                <option value="pix" className="text-black">💠 PIX</option>
+                <option value="cartao" className="text-black">💳 Cartão de Débito/Crédito</option>
+              </select>
+
+              {pagamento === 'dinheiro' && (
+                <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                  <label className="text-xs font-bold text-[#EED9D4] uppercase block mb-2">Valor Recebido do Cliente (R$)</label>
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    value={valorRecebido}
+                    placeholder="Ex: 100.00"
+                    onChange={(e) => setValorRecebido(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full p-3 rounded-lg bg-white text-[#6A283A] font-black text-lg outline-none focus:ring-2 focus:ring-[#EED9D4] transition-all"
+                  />
+                  
+                  {Number(valorRecebido) >= totalCompra && totalCompra > 0 && (
+                    <div className="mt-3 p-3 bg-green-500/20 border border-green-500/30 rounded-lg text-center animate-in zoom-in duration-300 shadow-inner">
+                      <p className="text-xs text-green-100 uppercase tracking-wider mb-1 font-bold">Troco a Devolver</p>
+                      <p className="text-2xl font-black text-green-400">
+                        {formataMoeda(Number(valorRecebido) - totalCompra)}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <button 
+              onClick={handleFinalizarVenda} 
+              disabled={carrinho.length === 0} 
+              className="w-full bg-[#EED9D4] text-[#6A283A] font-black py-4 rounded-xl hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed mb-3 uppercase tracking-wider text-sm md:text-base transition-all active:scale-95 shadow-[0_0_15px_rgba(238,217,212,0.2)] hover:shadow-[0_0_20px_rgba(238,217,212,0.5)]"
+            >
               Finalizar Venda
             </button>
           </div>
