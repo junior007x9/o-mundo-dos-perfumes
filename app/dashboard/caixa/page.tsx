@@ -1,676 +1,682 @@
-// app/dashboard/caixa/page.tsx
+// app/dashboard/page.tsx
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { getCaixaAberto, getVendasDoCaixa, getProdutosPDV, getClientesPDV, abrirCaixa, fecharCaixa, finalizarVenda, cadastrarClientePDV } from './actions';
-import { getUsuarioLogado } from '@/app/actions';
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { useState, useEffect } from 'react';
+import { getDadosDashboard, cancelarVendaAction, quitarVendaAction, atualizarNotaReceberAction } from './dashboardActions';
+import { getDadosFinanceiros } from './financeiro/actions'; 
+import Link from 'next/link';
 
-export default function CaixaPage() {
-  const [caixa, setCaixa] = useState<any>(null);
-  const [produtos, setProdutos] = useState<any[]>([]);
-  const [carrinho, setCarrinho] = useState<any[]>([]);
+export default function DashboardPage() {
+  const [dados, setDados] = useState<any>(null);
+  const [listaDespesas, setListaDespesas] = useState<any[]>([]); 
   const [carregando, setCarregando] = useState(true);
-  const [vendasCaixa, setVendasCaixa] = useState<any[]>([]);
-  const [vendedorLogado, setVendedorLogado] = useState<any>(null);
 
-  const [clientesDB, setClientesDB] = useState<any[]>([]);
-  const [clienteSelecionado, setClienteSelecionado] = useState<string>('');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [usuarioNome, setUsuarioNome] = useState('');
+  const [logs, setLogs] = useState<any[]>([]);
+
+  // 🚀 Controle das abas gerenciais (Agora com o Passo 5)
+  const [abaAtiva, setAbaAtiva] = useState('geral');
   
-  const [modalCliente, setModalCliente] = useState(false);
-  const [nomeCli, setNomeCli] = useState('');
-  const [telefoneCli, setTelefoneCli] = useState('');
-  const [dataNascCli, setDataNascCli] = useState('');
-  const [salvandoCli, setSalvandoCli] = useState(false);
-
-  const [vendaSucesso, setVendaSucesso] = useState<boolean>(false);
-  const [dadosUltimaVenda, setDadosUltimaVenda] = useState<any>(null);
-
-  const [buscaTexto, setBuscaTexto] = useState('');
-  const [cameraAberta, setCameraAberta] = useState(false);
-  const inputBuscaRef = useRef<HTMLInputElement>(null);
-
-  const [pagamento, setPagamento] = useState('dinheiro');
-  const [valorRecebido, setValorRecebido] = useState<number | string>('');
-
-  const [desconto, setDesconto] = useState<number | string>('');
-  const [valoresMultiplos, setValoresMultiplos] = useState({ dinheiro: '', pix: '', credito: '', debito: '' });
-  
-  // 🚀 Estados para as observações ocultas
-  const [observacaoDireta, setObservacaoDireta] = useState('');
-  const [observacaoMultipla, setObservacaoMultipla] = useState(''); // NOVO CAMPO
-
-  const [modalFechamento, setModalFechamento] = useState(false);
-  const [mostrarTutorial, setMostrarTutorial] = useState(true);
+  // 🚀 Estados para o Passo 5 (Metas e Comissões)
+  const [metaLoja, setMetaLoja] = useState<number>(50000); // Ex: Meta de 50 mil reais
+  const [taxaComissao, setTaxaComissao] = useState<number>(5); // Ex: 5% de comissão
 
   useEffect(() => {
-    async function carregarDados() {
-      const caixaAtual = await getCaixaAberto();
-      const listaProdutos = await getProdutosPDV();
-      const listaClientes = await getClientesPDV(); 
-      const usuario = await getUsuarioLogado(); 
-      
-      setCaixa(caixaAtual);
-      setProdutos(listaProdutos);
-      setClientesDB(listaClientes);
-      setVendedorLogado(usuario);
-
-      if (caixaAtual) {
-        const vendasDb = await getVendasDoCaixa(caixaAtual.id);
-        setVendasCaixa(vendasDb);
-      }
-      setCarregando(false);
-    }
-    carregarDados();
+    carregar();
   }, []);
 
-  useEffect(() => {
-    let html5QrCode: Html5Qrcode | null = null;
-    if (cameraAberta) {
-      html5QrCode = new Html5Qrcode("leitor-camera");
-      const config = { 
-        fps: 15, 
-        qrbox: { width: 250, height: 150 },
-        aspectRatio: 1.0,
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E,
-          Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.QR_CODE
-        ]
-      };
-      html5QrCode.start(
-        { facingMode: "environment" },
-        config,
-        (codigoLido) => {
-          if (html5QrCode) {
-            html5QrCode.stop().then(() => {
-              setCameraAberta(false);
-              setBuscaTexto(codigoLido);
-              processarBuscaProduto(codigoLido);
-            }).catch(err => console.error("Erro ao parar a câmera", err));
-          }
-        },
-        () => {}
-      ).catch((err) => {
-        console.error("Erro ao iniciar câmera", err);
-        alert("Não foi possível acessar a câmera.");
-        setCameraAberta(false);
-      });
-    }
-    return () => {
-      if (html5QrCode && html5QrCode.isScanning) {
-        html5QrCode.stop().catch(() => {});
-      }
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cameraAberta]);
+  async function carregar() {
+    setCarregando(true);
+    const res = await getDadosDashboard();
+    setDados(res);
+    setIsAdmin(res.isAdmin);
+    setUsuarioNome(res.usuario?.nome || '');
+    setLogs(res.logs || []);
 
-  const formataMoeda = (valor: number) => {
-    return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    try {
+      const fin = await getDadosFinanceiros();
+      setListaDespesas(fin.listaDespesas || []);
+    } catch (e) {
+      console.error("Erro ao carregar dados financeiros no painel:", e);
+    }
+
+    setCarregando(false);
+  }
+
+  const handleEstornarVenda = async (idVenda: number) => {
+    if(confirm('ATENÇÃO: Deseja realmente cancelar esta venda?\n\nO valor será subtraído do faturamento e os produtos voltarão automaticamente para o estoque.')) {
+      await cancelarVendaAction(idVenda);
+      alert('Venda estornada com sucesso!');
+      carregar(); 
+    }
   };
 
-  const formatarPagamento = (pag: string) => {
+  const handleQuitarConta = async (idVenda: number, nomeCliente: string) => {
+    if (confirm(`Confirmar liquidação total para ${nomeCliente}?\n\nO valor sairá da lista de pendentes e será marcado como recebido.`)) {
+      await quitarVendaAction(idVenda);
+      alert('Conta baixada com sucesso! 🎉');
+      carregar();
+    }
+  };
+
+  const handleAlterarNota = async (idVenda: number, notaAtual: string) => {
+    const novaNota = prompt("Atualize o histórico do pagamento (Ex: Pagou R$100, faltam 2x):", notaAtual);
+    if (novaNota !== null) {
+      await atualizarNotaReceberAction(idVenda, novaNota);
+      alert('Histórico atualizado!');
+      carregar();
+    }
+  };
+
+  const formatarPagamentoTabela = (pag: string) => {
     if (!pag) return 'DINHEIRO';
-    if (pag === 'credito') return 'CARTÃO DE CRÉDITO';
-    if (pag === 'debito') return 'CARTÃO DE DÉBITO';
+    const pLow = pag.toLowerCase();
+    if (pLow === 'credito') return 'CRÉDITO 💳';
+    if (pLow === 'debito') return 'DÉBITO 💳';
     
-    if (pag === 'venda_direta' || pag.startsWith('venda_direta:')) {
-      return 'VENDA DIRETA (PARCELADO) 📝';
+    if (pLow.startsWith('multiplo:')) {
+      if (pag.includes('obs=')) {
+        const match = pag.match(/obs=([^;]+)/);
+        const obsExtraida = match ? match[1] : '';
+        const limpaObs = obsExtraida.replace(';pago=true', '').replace('pago=true', '');
+        return limpaObs ? `MÚLTIPLO 🔀 (${limpaObs})` : 'MÚLTIPLO 🔀';
+      }
+      return 'MÚLTIPLO 🔀';
     }
     
-    if (pag.startsWith('multiplo:')) {
-      const partes = pag.replace('multiplo:', '').split(';');
-      const listaFormatada: string[] = [];
-      partes.forEach(p => {
-        const [k, v] = p.split('=');
-        // 🚀 Ignora o campo 'obs' para não aparecer no recibo do cliente
-        if (k !== 'obs' && Number(v) > 0) {
-          const nome = k === 'dinheiro' ? 'Dinheiro' : k === 'pix' ? 'PIX' : k === 'credito' ? 'Crédito' : 'Débito';
-          listaFormatada.push(`${nome}: R$ ${Number(v).toFixed(2)}`);
-        }
-      });
-      return `MÚLTIPLO (${listaFormatada.join(' + ')})`;
+    if (pLow.startsWith('venda_direta')) {
+      if (pag.includes(':obs=')) {
+        const obsExtraida = pag.split(':obs=')[1];
+        const limpaObs = obsExtraida.replace(';pago=true', '').replace('pago=true', '');
+        return `VENDA DIRETA 📝 (${limpaObs})`;
+      }
+      return 'VENDA DIRETA 📝';
     }
+    
     return pag.toUpperCase();
   };
 
-  const handleTelefoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let v = e.target.value.replace(/\D/g, '');
-    if (v.length <= 10) {
-      v = v.replace(/^(\d{2})(\d)/g, '($1) $2');
-      v = v.replace(/(\d{4})(\d)/, '$1-$2');
-    } else {
-      v = v.replace(/^(\d{2})(\d)/g, '($1) $2');
-      v = v.replace(/(\d{5})(\d)/, '$1-$2');
-    }
-    setTelefoneCli(v.substring(0, 15));
-  };
+  const formataMoeda = (valor: number) => valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-  const handleDataNascChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let v = e.target.value.replace(/\D/g, '');
-    if (v.length > 2 && v.length <= 4) {
-      v = v.replace(/^(\d{2})(\d+)/, '$1/$2');
-    } else if (v.length > 4) {
-      v = v.replace(/^(\d{2})(\d{2})(\d+)/, '$1/$2/$3');
-    }
-    setDataNascCli(v.substring(0, 10));
-  };
+  const exportarParaExcel = () => {
+    if (!dados || !dados.listaVendas || dados.listaVendas.length === 0) return;
 
-  const handleSalvarCliente = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!nomeCli.trim()) return alert("O nome do cliente é obrigatório!");
-    setSalvandoCli(true);
-    try {
-      const novoId = await cadastrarClientePDV(nomeCli, telefoneCli, dataNascCli);
-      const atualizados = await getClientesPDV(); 
-      setClientesDB(atualizados);
-      setClienteSelecionado(novoId.toString());
-      
-      setModalCliente(false);
-      setNomeCli('');
-      setTelefoneCli('');
-      setDataNascCli('');
-    } catch(err) {
-      alert("Erro ao cadastrar cliente.");
-    }
-    setSalvandoCli(false);
-  };
+    const vendasValidasRelatorio = dados.listaVendas.filter((v: any) => v.status !== 'cancelada');
+    const totalRelatorio = vendasValidasRelatorio.reduce((acc: number, v: any) => acc + v.total, 0);
+    const dataEmissao = new Date().toLocaleString('pt-BR');
+    
+    let csvCompleto = "\uFEFF"; 
+    csvCompleto += "O MUNDO DOS PERFUMES\n";
+    csvCompleto += `RELATÓRIO GERENCIAL DE VENDAS\n`;
+    csvCompleto += `Data de Emissão: ${dataEmissao}\n\n`;
+    csvCompleto += "Código do Cupom;Data e Hora;Forma de Pagamento;Status da Venda;Valor da Venda (R$)\n";
 
-  const adicionarAoCarrinho = (produto: any) => {
-    if (produto.estoque <= 0) {
-      alert('Produto sem estoque!');
-      return;
-    }
-    const itemExistente = carrinho.find((item) => item.id === produto.id);
-    if (itemExistente) {
-      setCarrinho(carrinho.map(item => item.id === produto.id ? { ...item, quantidade: item.quantidade + 1 } : item));
-    } else {
-      setCarrinho([...carrinho, { ...produto, quantidade: 1 }]);
-    }
-  };
+    dados.listaVendas.forEach((v: any) => {
+      const idCupom = `#${v.id}`;
+      const dataHora = new Date(v.data).toLocaleString('pt-BR');
+      const pagamentoStr = v.formaPagamento ? v.formaPagamento.toUpperCase() : 'DINHEIRO';
+      const statusStr = v.status === 'cancelada' ? 'CANCELADA' : 'CONCLUÍDA';
+      const valorStr = v.total.toFixed(2).replace('.', ',');
 
-  const processarBuscaProduto = (termoBusca: string) => {
-    if (!termoBusca.trim()) return;
-    const termo = termoBusca.toLowerCase();
-    const prodEncontrado = produtos.find(p => 
-      p.codigoBarras === termoBusca || 
-      p.nome?.toLowerCase().includes(termo) ||
-      p.marca?.toLowerCase().includes(termo) ||
-      p.precoVenda?.toString().includes(termo)
-    );
-    if (prodEncontrado) {
-      adicionarAoCarrinho(prodEncontrado);
-      setBuscaTexto('');
-    } else {
-      alert('Produto não encontrado no sistema!');
-    }
-    if (inputBuscaRef.current) inputBuscaRef.current.focus();
-  };
-
-  const removerDoCarrinho = (id: number) => {
-    setCarrinho(carrinho.filter(item => item.id !== id));
-  };
-
-  const totalCompra = carrinho.reduce((acc, item) => acc + (item.precoVenda * item.quantidade), 0);
-  const totalComDesconto = Math.max(0, totalCompra - (Number(desconto) || 0));
-
-  const totalPreenchidoMultiplo = 
-    (Number(valoresMultiplos.dinheiro) || 0) +
-    (Number(valoresMultiplos.pix) || 0) +
-    (Number(valoresMultiplos.credito) || 0) +
-    (Number(valoresMultiplos.debito) || 0);
-
-  const faltaPagarMultiplo = totalComDesconto - totalPreenchidoMultiplo;
-  
-  const trocoMultiplo = faltaPagarMultiplo < 0 && (Number(valoresMultiplos.dinheiro) || 0) >= Math.abs(faltaPagarMultiplo) 
-    ? Math.abs(faltaPagarMultiplo) 
-    : 0;
-
-  const multiploValido = totalPreenchidoMultiplo === totalComDesconto || (totalPreenchidoMultiplo > totalComDesconto && (Number(valoresMultiplos.dinheiro) || 0) >= trocoMultiplo);
-
-  const botaoDesabilitado = carrinho.length === 0 || 
-    (pagamento === 'multiplo' ? !multiploValido : 
-    (pagamento === 'dinheiro' && valorRecebido !== '' && Number(valorRecebido) < totalComDesconto) ||
-    (pagamento === 'venda_direta' && !clienteSelecionado)); 
-
-  const handleFinalizarVenda = async () => {
-    if (carrinho.length === 0) return;
-
-    // 🚀 INCLUI A OBSERVAÇÃO MULTIPLA E DIRETA NA STRING DE ENVIO
-    const formaEnvio = pagamento === 'multiplo'
-      ? `multiplo:dinheiro=${(Number(valoresMultiplos.dinheiro) || 0) - trocoMultiplo};pix=${Number(valoresMultiplos.pix) || 0};credito=${Number(valoresMultiplos.credito) || 0};debito=${Number(valoresMultiplos.debito) || 0}${observacaoMultipla.trim() ? `;obs=${observacaoMultipla.replace(/[:;=]/g, ' ')}` : ''}`
-      : pagamento === 'venda_direta' && observacaoDireta.trim()
-        ? `venda_direta:obs=${observacaoDireta.replace(/[:;=]/g, ' ')}`
-        : pagamento;
-
-    const clienteObj = clientesDB.find(c => c.id.toString() === clienteSelecionado);
-
-    setDadosUltimaVenda({ 
-      itens: [...carrinho], 
-      total: totalComDesconto, 
-      data: new Date().toISOString(),
-      pagamento: formaEnvio,
-      clienteNome: clienteObj ? clienteObj.nome : 'Consumidor Final',
-      vendedorNome: vendedorLogado ? vendedorLogado.nome : 'Sistema'
+      csvCompleto += `${idCupom};${dataHora};${pagamentoStr};${statusStr};${valorStr}\n`;
     });
-    
-    const idCliente = clienteSelecionado ? Number(clienteSelecionado) : undefined;
-    const idVendedor = vendedorLogado ? Number(vendedorLogado.id) : undefined;
-    
-    await finalizarVenda(caixa.id, carrinho, totalComDesconto, formaEnvio, idCliente, idVendedor);
-    
-    const vendasAtualizadas = await getVendasDoCaixa(caixa.id);
-    setVendasCaixa(vendasAtualizadas);
 
-    setCarrinho([]);
-    setValorRecebido('');
-    setDesconto('');
-    setValoresMultiplos({ dinheiro: '', pix: '', credito: '', debito: '' });
-    setObservacaoDireta('');
-    setObservacaoMultipla(''); // Limpa a observação múltipla
-    setPagamento('dinheiro');
-    setClienteSelecionado(''); 
-    setVendaSucesso(true);
-    
-    const novaLista = await getProdutosPDV();
-    setProdutos(novaLista);
+    csvCompleto += `\n;;;TOTAL FATURADO LÍQUIDO:;${totalRelatorio.toFixed(2).replace('.', ',')}\n`;
+
+    const blob = new Blob([csvCompleto], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `relatorio_vendas_mundo_perfumes_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
-  const dispararImpressaoTermica = () => {
-    if (!dadosUltimaVenda) return;
-    const popup = window.open('', '_blank', 'width=300,height=600');
-    if (!popup) return alert('Por favor, autorize pop-ups para realizar a impressão!');
-    const urlDaLogo = `${window.location.origin}/logo.png`;
+  const exportarParaPDF = () => {
+    if (!dados || !dados.listaVendas || dados.listaVendas.length === 0) return;
+
+    const popup = window.open('', '_blank', 'width=850,height=1000');
+    if (!popup) return alert('Por favor, autorize pop-ups no seu navegador para emitir o PDF!');
+
+    const vendasValidasRelatorio = dados.listaVendas.filter((v: any) => v.status !== 'cancelada');
+    const totalRelatorio = vendasValidasRelatorio.reduce((acc: number, v: any) => acc + v.total, 0);
+    const totalCancelado = dados.listaVendas.filter((v: any) => v.status === 'cancelada').reduce((acc: number, v: any) => acc + v.total, 0);
+    const dataEmissao = new Date().toLocaleString('pt-BR');
+
+    const linhasTabela = dados.listaVendas.map((v: any) => {
+      const statusClasse = v.status === 'cancelada' ? 'status-cancelada' : 'status-concluida';
+      const statusTexto = v.status === 'cancelada' ? 'CANCELADA' : 'CONCLUÍDA';
+      const valorClasse = v.status === 'cancelada' ? 'valor-cancelado' : 'valor-concluido';
+      return `
+        <tr class="${v.status === 'cancelada' ? 'linha-cancelada' : ''}">
+          <td><strong>#${v.id}</strong></td>
+          <td>${new Date(v.data).toLocaleString('pt-BR')}</td>
+          <td>${formatarPagamentoTabela(v.formaPagamento)}</td>
+          <td><span class="status-badge ${statusClasse}">${statusTexto}</span></td>
+          <td class="right bold ${valorClasse}">${formataMoeda(v.total)}</td>
+        </tr>
+      `;
+    }).join('');
+
     popup.document.write(`
       <html>
-        <head><style>@page{margin:0;} body{font-family:monospace;font-size:12px;padding:12px;width:58mm;margin:0;} .center{text-align:center;} .right{text-align:right;} .bold{font-weight:bold;} .divider{border-bottom:1px dashed #000;margin:6px 0;} table{width:100%;border-collapse:collapse;margin-top:4px;} td{font-size:11px;vertical-align:top;}</style></head>
+        <head>
+          <title>Relatório de Vendas - O Mundo dos Perfumes</title>
+          <style>
+            @page { size: A4; margin: 15mm 12mm; }
+            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #2d3748; margin: 0; padding: 0; font-size: 10.5pt; line-height: 1.5; background-color: #ffffff; }
+            .header { border-bottom: 3px solid #6A283A; padding-bottom: 12px; margin-bottom: 25px; display: table; width: 100%; }
+            .header-left { display: table-cell; vertical-align: bottom; }
+            .header-right { display: table-cell; text-align: right; vertical-align: bottom; font-size: 9pt; color: #718096; line-height: 1.3; }
+            .header-left h1 { color: #6A283A; margin: 0; font-size: 24pt; font-weight: 900; letter-spacing: -0.5px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 9.5pt; }
+            th { background: #6A283A; color: #ffffff; padding: 10px 12px; font-weight: 700; text-transform: uppercase; font-size: 8pt; letter-spacing: 0.5px; text-align: left; }
+            td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; color: #2d3748; vertical-align: middle; }
+            tr:nth-child(even) { background: #f7fafc; }
+            .status-badge { display: inline-block; padding: 3px 8px; font-size: 7.5pt; font-weight: 800; border-radius: 4px; text-transform: uppercase; }
+            .status-concluida { background-color: #c6f6d5; color: #22543d; }
+            .status-cancelada { background-color: #fed7d7; color: #742a2a; }
+            .right { text-align: right; }
+            .bold { font-weight: bold; }
+            .total-row { background: #fdf6f6 !important; font-size: 11pt; }
+            .total-row td { border-top: 2px solid #6A283A; border-bottom: 2px solid #6A283A; color: #6A283A; padding: 14px 12px; }
+          </style>
+        </head>
         <body>
-          <div class="center"><img src="${urlDaLogo}" style="max-width:32mm;" /></div>
-          <div class="center bold" style="font-size:13px; margin-top:4px;">O MUNDO DOS PERFUMES</div>
-          <div class="divider"></div><div>DATA: ${new Date(dadosUltimaVenda.data).toLocaleString('pt-BR')}</div>
-          <div>ATENDENTE: ${dadosUltimaVenda.vendedorNome.toUpperCase()}</div>
-          <div>CLIENTE: ${dadosUltimaVenda.clienteNome.toUpperCase()}</div>
-          <div class="divider"></div>
-          <table><tbody>${dadosUltimaVenda.itens.map((i: any) => `<tr><td>${i.quantidade}x ${i.nome.substring(0,16)}</td><td class="right">R$ ${(i.quantidade * i.precoVenda).toFixed(2)}</td></tr>`).join('')}</tbody></table>
-          <div class="divider"></div><div class="right bold">TOTAL: R$ ${dadosUltimaVenda.total.toFixed(2)}</div>
-          <div class="right" style="font-size:10px; margin-top:2px;">PAGO NO: ${dadosUltimaVenda.pagamento.startsWith('venda_direta') ? 'VENDA DIRETA (PARCELADO)' : formatarPagamento(dadosUltimaVenda.pagamento)}</div>
-          <div class="divider"></div><div class="center">OBRIGADO PELA PREFERÊNCIA!</div>
-          <script>window.onload=function(){window.print();setTimeout(()=>window.close(),500);}</script>
+          <div class="header">
+            <div class="header-left"><h1>O MUNDO DOS PERFUMES</h1><p>Histórico Geral de Auditoria</p></div>
+            <div class="header-right"><p>Data de Emissão: <strong>${dataEmissao}</strong></p></div>
+          </div>
+          <table>
+            <thead><tr><th style="width: 12%;">Cupom</th><th style="width: 25%;">Data e Hora</th><th style="width: 33%;">Forma de Pagamento</th><th style="width: 15%;">Status</th><th style="width: 15%;" class="right">Valor Líquido</th></tr></thead>
+            <tbody>${linhasTabela}<tr class="total-row bold"><td colspan="3"></td><td>TOTAL LÍQUIDO:</td><td class="right">${formataMoeda(totalRelatorio)}</td></tr></tbody>
+          </table>
         </body>
       </html>
     `);
     popup.document.close();
   };
 
-  const enviarWhatsApp = () => {
-    if (!dadosUltimaVenda) return;
-    let texto = `*O MUNDO DOS PERFUMES* 🛍️\nOlá ${dadosUltimaVenda.clienteNome !== 'Consumidor Final' ? dadosUltimaVenda.clienteNome : ''}! Obrigado pela preferência!\n\n*Atendente:* ${dadosUltimaVenda.vendedorNome}\n\n*Recibo da Compra:*\n`;
-    dadosUltimaVenda.itens.forEach((i: any) => {
-      texto += `▪ ${i.quantidade}x ${i.nome} - R$ ${(i.quantidade * i.precoVenda).toFixed(2)}\n`;
-    });
-    texto += `\n*Total Pago:* R$ ${dadosUltimaVenda.total.toFixed(2)}`;
-    texto += `\n*Forma de Pagamento:* ${dadosUltimaVenda.pagamento.startsWith('venda_direta') ? 'VENDA DIRETA (PARCELADO)' : formatarPagamento(dadosUltimaVenda.pagamento)}\n\nVolte Sempre! ✨`;
-    
-    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
+  const dispararImpressaoEtiqueta = (produto: any) => {
+    const popup = window.open('', '_blank', 'width=400,height=400');
+    if (!popup) return alert('Por favor, autorize pop-ups para gerar a etiqueta!');
+    popup.document.write(`
+      <html>
+        <head>
+          <style>
+            body { font-family: 'Courier New', monospace; padding: 15px; text-align: center; color: #000; }
+            .box { border: 2px dashed #000; padding: 12px; border-radius: 6px; max-width: 250px; margin: 0 auto; }
+            .brand { font-size: 8pt; font-weight: bold; text-transform: uppercase; color: #555; }
+            .title { font-size: 11pt; font-weight: bold; margin: 6px 0; height: 32px; overflow: hidden; }
+            .price { font-size: 16pt; font-weight: 900; margin: 6px 0; }
+            .bar { background: #000; height: 30px; width: 100%; margin: 6px auto; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 6pt; letter-spacing: 2px; }
+          </style>
+        </head>
+        <body>
+          <div class="box">
+            <div class="brand">${produto.marca || 'O MUNDO DOS PERFUMES'}</div>
+            <div class="title">${produto.nome}</div>
+            <div class="price">${formataMoeda(produto.precoVenda)}</div>
+            <div class="bar">|||||||||||||||||||||||||||||||</div>
+            <div style="font-size: 8pt; font-weight: bold;">${produto.codigoBarras || 'SEM CÓDIGO'}</div>
+          </div>
+          <script>window.onload = function() { window.print(); setTimeout(() => window.close(), 600); }</script>
+        </body>
+      </html>
+    `);
+    popup.document.close();
   };
 
-  const vendasValidas = vendasCaixa.filter(v => v.status !== 'cancelada');
-  const obterValorPorForma = (forma: string, tipo: string, totalVenda: number) => {
+  if (carregando) return <div className="p-8 text-center text-[#6A283A] font-bold animate-pulse">Carregando Painel Geral...</div>;
+
+  const listaVendas = dados?.listaVendas || [];
+  const listaProdutos = dados?.listaProdutos || [];
+  const listaClientes = dados?.listaClientes || [];
+  const listaItens = dados?.listaItens || [];
+
+  const dataHoje = new Date().toISOString().split('T')[0];
+  const mesAtual = new Date().toISOString().slice(0, 7);
+  
+  const vendasValidas = listaVendas.filter((v: any) => v.status !== 'cancelada');
+  const vendasHoje = vendasValidas.filter((v: any) => v.data && v.data.startsWith(dataHoje));
+  const vendasMes = vendasValidas.filter((v: any) => v.data && v.data.startsWith(mesAtual));
+
+  const totalVendidoHoje = vendasHoje.reduce((acc: number, v: any) => acc + v.total, 0);
+  const totalVendidoMes = vendasMes.reduce((acc: number, v: any) => acc + v.total, 0);
+  const totalVendidoSempre = vendasValidas.reduce((acc: number, v: any) => acc + v.total, 0);
+  
+  const produtosBaixoEstoque = listaProdutos.filter((p: any) => p.estoque > 0 && p.estoque <= 5);
+  const produtosSemEstoque = listaProdutos.filter((p: any) => p.estoque === 0);
+
+  const obterPagamento = (v: any) => String(v.formaPagamento || '').toLowerCase();
+
+  const hojeDinheiro = vendasHoje.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'dinheiro', v.total), 0);
+  const hojePix = vendasHoje.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'pix', v.total), 0);
+  const hojeCredito = vendasHoje.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'credito', v.total), 0);
+  const hojeDebito = vendasHoje.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'debito', v.total), 0);
+
+  const mesDinheiro = vendasMes.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'dinheiro', v.total), 0);
+  const mesPix = vendasMes.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'pix', v.total), 0);
+  const mesCredito = vendasMes.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'credito', v.total), 0);
+  const mesDebito = vendasMes.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'debito', v.total), 0);
+
+  const hojeVendaDireta = vendasHoje.filter((v: any) => obterPagamento(v).startsWith('venda_direta') && !obterPagamento(v).includes('pago=true')).reduce((acc: number, v: any) => acc + v.total, 0);
+  const mesVendaDireta = vendasMes.filter((v: any) => obterPagamento(v).startsWith('venda_direta') && !obterPagamento(v).includes('pago=true')).reduce((acc: number, v: any) => acc + v.total, 0);
+  const totalVendaDiretaSempre = vendasValidas.filter((v: any) => obterPagamento(v).startsWith('venda_direta') && !obterPagamento(v).includes('pago=true')).reduce((acc: number, v: any) => acc + v.total, 0);
+
+  function obterValorPorForma(forma: string, tipo: string, totalVenda: number) {
     if (!forma) return 0;
-    const f = forma.toLowerCase();
+    const f = String(forma).toLowerCase();
     if (f.startsWith('multiplo:')) {
       const partes = f.replace('multiplo:', '').split(';');
       for (const p of partes) {
         const [k, v] = p.split('=');
-        if (k === tipo) return Number(v) || 0;
+        if (k === tipo || (tipo === 'credito' && k === 'cartao')) return Number(v) || 0;
       }
       return 0;
     }
-    if (tipo === 'venda_direta' && f.startsWith('venda_direta')) return totalVenda;
-    return f === tipo ? totalVenda : 0;
-  };
-
-  const resumoTurno = {
-    dinheiro: vendasValidas.reduce((acc, v) => acc + obterValorPorForma(v.formaPayment || v.formaPagamento, 'dinheiro', v.total), 0),
-    pix: vendasValidas.reduce((acc, v) => acc + obterValorPorForma(v.formaPayment || v.formaPagamento, 'pix', v.total), 0),
-    credito: vendasValidas.reduce((acc, v) => acc + obterValorPorForma(v.formaPayment || v.formaPagamento, 'credito', v.total), 0),
-    debito: vendasValidas.reduce((acc, v) => acc + obterValorPorForma(v.formaPayment || v.formaPagamento, 'debito', v.total), 0),
-    venda_direta: vendasValidas.reduce((acc, v) => acc + obterValorPorForma(v.formaPayment || v.formaPagamento, 'venda_direta', v.total), 0),
-  };
-  const totalVendidoTurno = resumoTurno.dinheiro + resumoTurno.pix + resumoTurno.credito + resumoTurno.debito + resumoTurno.venda_direta;
-
-  const handleFecharCaixa = async () => {
-    await fecharCaixa(caixa.id, caixa.saldoInicial + totalVendidoTurno);
-    setCaixa(null);
-    setModalFechamento(false);
-  };
-
-  const produtosFiltrados = produtos.filter((p) => {
-    if (!buscaTexto.trim()) return true;
-    const termo = buscaTexto.toLowerCase();
-    
-    const matchNome = p.nome?.toLowerCase().includes(termo);
-    const matchBarra = p.codigoBarras?.toLowerCase().includes(termo);
-    const matchMarca = p.marca?.toLowerCase().includes(termo);
-    const matchPreco = p.precoVenda?.toString().includes(termo);
-
-    return matchNome || matchBarra || matchMarca || matchPreco;
-  });
-
-  if (carregando) return <div className="p-8 text-center text-[#6A283A] font-bold text-lg">Carregando PDV...</div>;
-
-  if (!caixa) {
-    return (
-      <div className="max-w-md mx-auto mt-10 md:mt-20 bg-white p-6 md:p-8 rounded-xl shadow-xl border border-[#E0DDDD] text-center">
-        <div className="text-5xl mb-4 animate-pulse">🔒</div>
-        <h2 className="text-2xl font-black text-[#6A283A] mb-2">Caixa Fechado</h2>
-        <p className="text-zinc-500 mb-6 font-medium">É necessário abrir o caixa e informar o troco inicial.</p>
-        <form action={abrirCaixa} onSubmit={() => setTimeout(() => window.location.reload(), 1000)}>
-          <input name="saldoInicial" type="number" step="0.01" defaultValue="0" required className="w-full p-4 border border-[#E0DDDD] bg-zinc-50 focus:ring-2 focus:ring-[#6A283A] rounded-lg mb-6 text-center text-2xl font-bold outline-none text-zinc-800" />
-          <button type="submit" className="w-full bg-[#6A283A] text-white font-black py-4 rounded-lg hover:bg-[#521e2d] transition-all uppercase flex justify-center items-center gap-2 text-lg shadow-md">
-            🔑 Abrir Caixa Agora
-          </button>
-        </form>
-      </div>
-    );
+    if (f === tipo) return totalVenda;
+    if (tipo === 'credito' && f === 'cartao') return totalVenda;
+    return 0;
   }
 
-  if (vendaSucesso) {
+  const idsVendasValidas = new Set(vendasValidas.map((v: any) => v.id));
+  const idsVendasMes = new Set(vendasMes.map((v: any) => v.id));
+  
+  const custoProdutoMap = new Map<number, number>(
+    listaProdutos.map((p: any) => [Number(p.id), Number(p.precoCusto || 0)])
+  );
+
+  let custoMercadoriaTotal = 0;
+  let custoMercadoriaMes = 0;
+  const vendasPorProduto: Record<number, number> = {};
+  
+  listaItens.forEach((item: any) => {
+    if (idsVendasValidas.has(item.idVenda)) {
+      const itemId = Number(item.idProduto);
+      const itemQtd = Number(item.quantidade || 0);
+
+      vendasPorProduto[itemId] = (vendasPorProduto[itemId] || 0) + itemQtd;
+      const custoUnitario = Number(custoProdutoMap.get(itemId) || 0);
+      
+      custoMercadoriaTotal += (custoUnitario * itemQtd);
+
+      if (idsVendasMes.has(item.idVenda)) {
+        custoMercadoriaMes += (custoUnitario * itemQtd);
+      }
+    }
+  });
+
+  const produtosMaisVendidos = listaProdutos
+    .map((p: any) => ({ ...p, qtdVendida: vendasPorProduto[p.id] || 0 }))
+    .sort((a: any, b: any) => b.qtdVendida - a.qtdVendida);
+
+  const topProduto = produtosMaisVendidos.length > 0 && produtosMaisVendidos[0].qtdVendida > 0 ? produtosMaisVendidos[0] : null;
+  const totalProdutosCadastrados = listaProdutos.length;
+  
+  const valorPotencialAlcancado = listaProdutos.reduce((acc: number, p: any) => acc + (Number(p.precoVenda || 0) * Number(p.estoque || 0)), 0);
+  const capitalInvestidoEstoque = listaProdutos.reduce((acc: number, p: any) => acc + (Number(p.precoCusto || 0) * (p.estoque > 0 ? Number(p.estoque) : 0)), 0);
+
+  const despesasOperacionaisMes = listaDespesas
+    .filter((d: any) => d.categoria !== 'Estoque / Mercadoria' && d.data && d.data.startsWith(mesAtual))
+    .reduce((acc: number, d: any) => acc + Number(d.valor || 0), 0);
+
+  const despesasOperacionaisTotal = listaDespesas
+    .filter((d: any) => d.categoria !== 'Estoque / Mercadoria')
+    .reduce((acc: number, d: any) => acc + Number(d.valor || 0), 0);
+
+  const clienteNomeMap = new Map<number, string>(
+    listaClientes.map((c: any) => [Number(c.id), String(c.nome || 'Consumidor Fixo')])
+  );
+
+  // 🚀 LÓGICA DO PASSO 5: Agrupamento de Vendas por Vendedor (Comissões)
+  const vendasPorVendedor = vendasMes.reduce((acc: any, v: any) => {
+    // Se não houver idVendedor registrado, consideramos como "Caixa Loja (Sede)"
+    const id = v.idVendedor ? String(v.idVendedor) : 'Loja Principal';
+    acc[id] = (acc[id] || 0) + Number(v.total || 0);
+    return acc;
+  }, {});
+
+  const progressoMeta = Math.min((totalVendidoMes / metaLoja) * 100, 100);
+
+  if (!isAdmin) {
     return (
-      <div className="max-w-md mx-auto mt-10 md:mt-20 bg-white p-8 rounded-2xl shadow-xl border border-green-200 text-center animate-in fade-in zoom-in duration-300">
-        <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 animate-bounce">✓</div>
-        <h2 className="text-3xl font-black text-green-800 uppercase">Venda Feita!</h2>
-        <p className="text-zinc-600 mt-2 mb-8 text-lg">Pagamento registrado com sucesso.</p>
-        <div className="space-y-4">
-          <button onClick={dispararImpressaoTermica} className="w-full bg-[#6A283A] text-white font-black py-4 rounded-xl hover:bg-[#521e2d] transition-all uppercase shadow-md flex items-center justify-center gap-2 text-lg">
-            🖨️ Imprimir Recibo
-          </button>
-          <button onClick={enviarWhatsApp} className="w-full bg-[#25D366] text-white font-black py-4 rounded-xl hover:bg-[#128C7E] transition-all uppercase shadow-md flex items-center justify-center gap-2 text-lg">
-            📱 Enviar no WhatsApp
-          </button>
-          <button onClick={() => setVendaSucesso(false)} className="w-full bg-zinc-100 text-zinc-800 font-bold py-4 rounded-xl hover:bg-zinc-200 transition-all uppercase mt-4 text-lg">
-            🛒 Fazer Nova Venda
-          </button>
-        </div>
+      <div className="bg-gradient-to-br from-[#6A283A] to-[#521e2d] text-white p-6 md:p-10 rounded-2xl text-center mt-10 max-w-2xl mx-auto">
+        <h2 className="text-2xl font-black uppercase text-[#EED9D4]">Olá, {usuarioNome}!</h2>
+        <p className="mt-2 text-zinc-200">Suas vendas deste mês: <strong>{formataMoeda(vendasPorVendedor[String(dados?.idVendedorLogado)] || 0)}</strong></p>
+        <Link href="/dashboard/caixa" className="inline-block bg-[#EED9D4] text-[#6A283A] font-black py-4 px-10 rounded-xl mt-4">🛒 Abrir o Caixa (PDV)</Link>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-5rem)] lg:h-[calc(100vh-6rem)] gap-3 md:gap-4 overflow-hidden min-h-0">
+    <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
       
-      {modalCliente && (
-        <div className="fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white p-6 md:p-8 rounded-2xl w-full max-w-sm shadow-2xl">
-            <h3 className="font-black text-2xl text-[#6A283A] mb-2">Novo Cliente 👤</h3>
-            <p className="text-zinc-500 text-sm mb-6">Cadastre rapidamente para vincular à venda.</p>
-            <form onSubmit={handleSalvarCliente} className="space-y-4">
-              <div>
-                <label className="text-xs font-bold text-zinc-600 block mb-1">Nome Completo *</label>
-                <input type="text" required value={nomeCli} onChange={e => setNomeCli(e.target.value)} className="w-full p-3 rounded-lg bg-zinc-50 border border-zinc-300 font-bold text-sm outline-none focus:ring-2 focus:ring-[#6A283A]" placeholder="Ex: João Silva" />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-zinc-600 block mb-1">WhatsApp</label>
-                <input type="text" value={telefoneCli} onChange={handleTelefoneChange} className="w-full p-3 rounded-lg bg-zinc-50 border border-zinc-300 font-bold text-sm outline-none focus:ring-2 focus:ring-[#6A283A]" placeholder="(00) 00000-0000" />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-zinc-600 block mb-1">Data de Nascimento</label>
-                <input type="text" value={dataNascCli} onChange={handleDataNascChange} className="w-full p-3 rounded-lg bg-zinc-50 border border-zinc-300 font-bold text-sm outline-none focus:ring-2 focus:ring-[#6A283A]" placeholder="DD/MM/AAAA" />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setModalCliente(false)} className="flex-1 bg-zinc-200 text-zinc-800 font-bold py-3 rounded-xl hover:bg-zinc-300 transition-colors uppercase text-sm">Cancelar</button>
-                <button type="submit" disabled={salvandoCli} className="flex-[2] bg-[#6A283A] text-white font-black py-3 rounded-xl hover:bg-[#521e2d] transition-colors uppercase shadow-md text-sm disabled:opacity-50">{salvandoCli ? 'Salvando...' : 'Salvar e Vincular'}</button>
-              </div>
-            </form>
+      <div className="bg-gradient-to-r from-[#EED9D4]/40 to-white p-5 rounded-2xl border border-[#6A283A]/20 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="bg-[#6A283A] p-3 rounded-full shadow-lg border-2 border-white text-white">🛡️</div>
+          <div>
+            <h3 className="font-black text-[#6A283A] text-lg uppercase tracking-wide">Módulo de Governança Avançada</h3>
+            <p className="text-zinc-600 text-sm mt-0.5 font-medium">Controle automatizado de carteira, P&L estruturado, fluxo de mercadoria e rotulagem.</p>
           </div>
         </div>
-      )}
+      </div>
 
-      {modalFechamento && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white p-6 md:p-8 rounded-2xl w-full max-w-sm shadow-2xl">
-            <h3 className="font-black text-2xl text-[#6A283A] mb-2">Resumo do Dia 📊</h3>
-            <p className="text-zinc-500 text-sm mb-6">Confira os valores antes de encerrar o caixa.</p>
-            <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 space-y-3 mb-6">
-              <div className="flex justify-between items-center text-zinc-700">
-                <span className="font-bold">💵 Dinheiro:</span>
-                <span className="font-black text-lg">{formataMoeda(resumoTurno.dinheiro)}</span>
-              </div>
-              <div className="flex justify-between items-center text-zinc-700">
-                <span className="font-bold">💠 PIX:</span>
-                <span className="font-black text-lg">{formataMoeda(resumoTurno.pix)}</span>
-              </div>
-              <div className="flex justify-between items-center text-zinc-700">
-                <span className="font-bold">💳 Crédito:</span>
-                <span className="font-black text-lg text-blue-700">{formataMoeda(resumoTurno.credito)}</span>
-              </div>
-              <div className="flex justify-between items-center text-zinc-700">
-                <span className="font-bold">💳 Débito:</span>
-                <span className="font-black text-lg text-teal-700">{formataMoeda(resumoTurno.debito)}</span>
-              </div>
-              <div className="flex justify-between items-center text-zinc-700 border-t border-dashed border-zinc-200 pt-2 text-[#6A283A]">
-                <span className="font-bold">📝 Venda Direta:</span>
-                <span className="font-black text-lg">{formataMoeda(resumoTurno.venda_direta)}</span>
-              </div>
-              <div className="border-t border-zinc-200 pt-3 mt-3 flex justify-between items-center text-[#6A283A]">
-                <span className="font-black uppercase text-sm">Total Vendido:</span>
-                <span className="font-black text-2xl">{formataMoeda(totalVendidoTurno)}</span>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => setModalFechamento(false)} className="flex-1 bg-zinc-200 text-zinc-800 font-bold py-3 rounded-xl hover:bg-zinc-300 transition-colors uppercase text-sm">Voltar</button>
-              <button onClick={handleFecharCaixa} className="flex-[2] bg-red-600 text-white font-black py-3 rounded-xl hover:bg-red-700 transition-colors uppercase shadow-md text-sm">Encerrar Caixa</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {cameraAberta && (
-        <div className="fixed inset-0 bg-black/95 z-[9999] flex flex-col items-center justify-center p-4 backdrop-blur-md">
-          <div className="w-full max-w-sm flex flex-col items-center gap-6">
-            <h2 className="text-2xl font-black text-white uppercase tracking-widest">Lendo Código</h2>
-            <div id="leitor-camera" className="w-full aspect-square bg-black rounded-xl"></div>
-            <button onClick={() => setCameraAberta(false)} className="w-full bg-white/10 text-white font-bold py-4 rounded-xl uppercase">✖ Cancelar</button>
-          </div>
-        </div>
-      )}
-
-      {mostrarTutorial && (
-        <div className="flex-shrink-0 bg-gradient-to-r from-blue-50 to-white p-3 rounded-xl border border-blue-200 shadow-sm flex items-center gap-3 relative">
-          <button onClick={() => setMostrarTutorial(false)} className="absolute top-2 right-2 text-blue-400 hover:text-red-500 font-bold text-xs">✖</button>
-          <div className="flex-1 pr-6">
-            <h3 className="font-black text-blue-900 text-xs uppercase tracking-wide">Como registrar uma venda?</h3>
-            <div className="text-blue-800/80 text-[11px] md:text-xs mt-1 font-medium flex flex-col md:flex-row md:gap-4 gap-1">
-              <p><strong>1</strong> Adicione os produtos no catálogo.</p>
-              <p><strong>2</strong> Informe desconto ou cliente caso aplicável.</p>
-              <p><strong>3</strong> Escolha o pagamento (simples ou múltiplo) e conclua!</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="flex-shrink-0 bg-white p-2 rounded-xl shadow-sm border border-[#E0DDDD] flex gap-2">
-        <div className="relative flex-1">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">🔍</span>
-          <input 
-            ref={inputBuscaRef} type="text" value={buscaTexto} onChange={(e) => setBuscaTexto(e.target.value)}
-            placeholder="Buscar por nome, marca, código ou preço..."
-            className="w-full pl-9 p-3 border border-[#E0DDDD] rounded-lg focus:ring-2 focus:ring-[#6A283A] outline-none font-bold text-sm transition-all"
-            autoFocus
-          />
-        </div>
-        <button onClick={() => setCameraAberta(true)} className="bg-[#6A283A] text-white px-4 py-2 rounded-lg font-black uppercase text-sm flex items-center gap-2 hover:bg-[#521e2d] transition-colors">
-          <span>📷</span> <span className="hidden sm:inline">Ler Código</span>
+      <div className="flex overflow-x-auto gap-2 border-b border-zinc-200 pb-px scrollbar-none">
+        <button onClick={() => setAbaAtiva('geral')} className={`px-5 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'geral' ? 'border-[#6A283A] text-[#6A283A]' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>
+          📊 Painel Geral
+        </button>
+        <button onClick={() => setAbaAtiva('receber')} className={`px-5 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'receber' ? 'border-purple-600 text-purple-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>
+          📝 1: A Receber
+        </button>
+        <button onClick={() => setAbaAtiva('dre')} className={`px-5 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'dre' ? 'border-blue-600 text-blue-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>
+          🧮 2: DRE Gerencial
+        </button>
+        <button onClick={() => setAbaAtiva('giro')} className={`px-5 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'giro' ? 'border-orange-500 text-orange-500' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>
+          📦 3: Giro de Estoque
+        </button>
+        <button onClick={() => setAbaAtiva('etiquetas')} className={`px-5 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'etiquetas' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>
+          🏷️ 4: Etiquetas
+        </button>
+        {/* NOVO BOTÃO DO PASSO 5 */}
+        <button onClick={() => setAbaAtiva('comissoes')} className={`px-5 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'comissoes' ? 'border-amber-500 text-amber-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>
+          🎖️ 5: Metas & Comissões
         </button>
       </div>
 
-      <div className="flex-1 flex flex-col lg:flex-row gap-3 min-h-0 overflow-hidden">
-        
-        <div className="flex-1 bg-white flex flex-col rounded-xl shadow-sm border border-[#E0DDDD] min-h-0 overflow-hidden">
-          <div className="flex-shrink-0 flex justify-between items-center p-3 border-b border-[#E0DDDD] bg-zinc-50">
-            <h2 className="text-lg font-black text-[#6A283A]">Catálogo Rápido</h2>
-            <button onClick={() => setModalFechamento(true)} className="text-xs font-bold bg-red-600 text-white px-3 py-1 rounded-full uppercase shadow-sm">🔒 Fechar Caixa</button>
+      {abaAtiva === 'geral' && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          {/* O conteúdo da Aba Geral mantém-se inalterado */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-[#6A283A] flex flex-col justify-between">
+              <div>
+                <h3 className="text-xs md:text-sm font-bold text-zinc-500 uppercase tracking-wider">Vendas de Hoje</h3>
+                <p className="text-2xl font-black text-[#6A283A] mt-2">{formataMoeda(totalVendidoHoje)}</p>
+              </div>
+            </div>
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-[#A56877] flex flex-col justify-between">
+              <div>
+                <h3 className="text-xs md:text-sm font-bold text-zinc-500 uppercase tracking-wider">Faturamento do Mês</h3>
+                <p className="text-2xl font-black text-[#A56877] mt-2">{formataMoeda(totalVendidoMes)}</p>
+              </div>
+            </div>
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-purple-600 flex flex-col justify-between">
+              <div>
+                <h3 className="text-xs md:text-sm font-bold text-zinc-500 uppercase tracking-wider">Total Venda Direta</h3>
+                <p className="text-2xl font-black text-purple-600 mt-2">{formataMoeda(totalVendaDiretaSempre)}</p>
+              </div>
+            </div>
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-orange-500 flex flex-col justify-between">
+              <div>
+                <h3 className="text-xs md:text-sm font-bold text-zinc-500 uppercase tracking-wider">Custos c/ Mercadoria</h3>
+                <p className="text-2xl font-black text-orange-600 mt-2">{formataMoeda(custoMercadoriaMes)}</p>
+              </div>
+            </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-3">
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2">
-              {produtosFiltrados.map((p) => (
-                <button key={p.id} onClick={() => adicionarAoCarrinho(p)} disabled={p.estoque <= 0} className={`p-3 border-2 rounded-xl text-left transition-all flex flex-col justify-between ${p.estoque > 0 ? 'border-[#E0DDDD] hover:border-[#6A283A] bg-white hover:bg-[#f9f1f0] active:scale-95 shadow-sm' : 'border-zinc-200 opacity-50 bg-zinc-100 cursor-not-allowed'}`}>
-                  <div>
-                    <h3 className="font-bold text-zinc-900 text-xs leading-tight line-clamp-2 h-8">{p.nome}</h3>
-                    {p.marca && <p className="text-[9px] font-black text-purple-600 uppercase mt-0.5 line-clamp-1">{p.marca}</p>}
-                    <p className="text-[10px] font-semibold text-zinc-500 mt-1">Estoque: {p.estoque}</p>
-                  </div>
-                  <p className="text-sm font-black text-[#6A283A] mt-1.5 border-t border-zinc-100 pt-1 w-full">{formataMoeda(p.precoVenda)}</p>
-                </button>
-              ))}
-              {produtosFiltrados.length === 0 && (
-                <div className="col-span-full p-8 text-center text-zinc-400 font-medium text-sm flex flex-col items-center">
-                  <span className="text-3xl mb-2">🤔</span>
-                  Nenhum produto encontrado com essa busca.
-                </div>
-              )}
+          
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD]">
+            <h2 className="text-xl font-bold text-[#6A283A] mb-4">Histórico de Vendas</h2>
+            <div className="overflow-x-auto rounded-lg border border-[#E0DDDD]/60 flex-1 max-h-[400px]">
+              <table className="w-full text-left whitespace-nowrap">
+                <thead className="bg-zinc-50 sticky top-0 border-b border-[#E0DDDD] z-10">
+                  <tr>
+                    <th className="p-3 text-xs font-bold text-zinc-600">Data</th>
+                    <th className="p-3 text-xs font-bold text-zinc-600">Valor</th>
+                    <th className="p-3 text-xs font-bold text-zinc-600">Pagamento</th>
+                    <th className="p-3 text-xs font-bold text-zinc-600">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {listaVendas.map((venda: any) => (
+                    <tr key={venda.id} className="border-b border-[#E0DDDD]/50">
+                      <td className="p-3 text-sm text-zinc-600">{new Date(venda.data).toLocaleString('pt-BR')}</td>
+                      <td className="p-3 text-sm font-black text-green-600">{formataMoeda(venda.total)}</td>
+                      <td className="p-3 text-xs font-bold text-zinc-500 uppercase">{formatarPagamentoTabela(venda.formaPagamento)}</td>
+                      <td className="p-3"><span className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-black uppercase">Concluída</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
+      )}
 
-        <div className="w-full lg:w-[380px] xl:w-[420px] flex-shrink-0 bg-zinc-50 flex flex-col rounded-xl shadow-lg border border-[#E0DDDD] min-h-0 overflow-hidden">
-          
-          <div className="flex-shrink-0 bg-[#6A283A] text-white p-3 flex justify-between items-center shadow-md">
-            <h2 className="text-sm font-black uppercase">🛒 Cupom Fiscal</h2>
-            <span className="bg-white text-[#6A283A] font-black px-2 py-0.5 rounded text-xs">{carrinho.length} Itens</span>
+      {abaAtiva === 'receber' && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300">
+          <div className="mb-4">
+            <h2 className="text-xl font-black text-purple-700">📑 Monitoramento Dinâmico de Contas a Receber</h2>
+            <p className="text-zinc-500 text-sm mt-0.5">Clique para dar baixa total, registrar amortizações e conferir notas fiscais.</p>
           </div>
-          
-          <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-white min-h-[100px]">
-            {carrinho.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-zinc-400 p-4 text-center">
-                <span className="text-4xl">🛍️</span>
-                <p className="font-medium text-sm">O carrinho está vazio</p>
-              </div>
-            ) : (
-              carrinho.map((item) => (
-                <div key={item.id} className="flex justify-between items-center bg-white p-2 rounded-lg border border-zinc-200 shadow-sm">
-                  <div className="flex-1 pr-2">
-                    <p className="font-bold text-zinc-800 text-xs leading-tight">{item.nome}</p>
-                    <p className="text-[11px] text-zinc-500 mt-0.5"><strong>{item.quantidade}x</strong> {formataMoeda(item.precoVenda)}</p>
-                  </div>
-                  <div className="flex items-center gap-3 pl-2 border-l border-zinc-100">
-                    <span className="font-black text-[#6A283A] text-sm whitespace-nowrap">{formataMoeda(item.quantidade * item.precoVenda)}</span>
-                    <button onClick={() => removerDoCarrinho(item.id)} className="text-red-500 font-bold text-sm">✖</button>
-                  </div>
-                </div>
-              ))
-            )}
+          <div className="overflow-x-auto rounded-lg border border-[#E0DDDD]">
+            <table className="w-full text-left whitespace-nowrap">
+              <thead className="bg-purple-50 border-b border-purple-200">
+                <tr>
+                  <th className="p-3 text-xs font-bold text-purple-900">Data</th>
+                  <th className="p-3 text-xs font-bold text-purple-900">Cliente Responsável</th>
+                  <th className="p-3 text-xs font-bold text-purple-900">Nota de Conferência (Interna)</th>
+                  <th className="p-3 text-xs font-bold text-purple-900">Montante Devedor</th>
+                  <th className="p-3 text-xs font-bold text-purple-900 text-center">Ações de Cobrança</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100 font-semibold text-sm">
+                {listaVendas
+                  .filter((v: any) => v.status !== 'cancelada' && (obterPagamento(v).startsWith('venda_direta') || obterPagamento(v).includes('obs=')))
+                  .map((venda: any) => {
+                    let notaInterna = 'Nota Geral de Balcão';
+                    if (venda.formaPagamento.includes('obs=')) {
+                      const match = venda.formaPagamento.match(/obs=([^;]+)/);
+                      notaInterna = match ? match[1] : notaInterna;
+                    } else if (venda.formaPagamento.includes(':obs=')) {
+                      notaInterna = venda.formaPagamento.split(':obs=')[1];
+                    }
+                    
+                    const limpaNota = notaInterna.replace(';pago=true', '').replace('pago=true', '');
+                    const isQuitada = venda.formaPagamento.includes('pago=true');
+                    const nomeCliente = clienteNomeMap.get(Number(venda.idCliente)) || 'Consumidor Final (Fixos)';
+
+                    return (
+                      <tr key={venda.id} className={`transition-colors ${isQuitada ? 'bg-green-50/40 opacity-70' : 'hover:bg-purple-50/20'}`}>
+                        <td className="p-3 text-sm text-zinc-500">{new Date(venda.data).toLocaleDateString('pt-BR')}</td>
+                        <td className="p-3 text-sm font-black text-zinc-800">{String(nomeCliente)}</td>
+                        <td className={`p-3 text-sm font-medium ${isQuitada ? 'text-zinc-500 line-through' : 'text-purple-700 bg-purple-50/40'}`}>{limpaNota}</td>
+                        <td className={`p-3 text-sm font-black ${isQuitada ? 'text-zinc-400 line-through' : 'text-purple-600'}`}>{formataMoeda(venda.total)}</td>
+                        <td className="p-3 text-center">
+                          {isQuitada ? (
+                            <span className="bg-green-100 text-green-700 border border-green-300 px-3 py-1 rounded text-[10px] font-black uppercase tracking-wider">✅ Quitado</span>
+                          ) : (
+                            <div className="flex justify-center items-center gap-2">
+                              <button onClick={() => handleQuitarConta(venda.id, String(nomeCliente))} className="bg-green-600 text-white text-xs font-black px-3 py-1.5 rounded hover:bg-green-700 transition-colors uppercase shadow-sm">💰 Quitar</button>
+                              <button onClick={() => handleAlterarNota(venda.id, limpaNota)} className="bg-purple-100 text-purple-700 text-xs font-bold px-3 py-1.5 rounded hover:bg-purple-200 transition-colors uppercase">📝 Notas</button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
           </div>
+        </div>
+      )}
 
-          <div className="flex-shrink-0 bg-white border-t-2 border-zinc-200 p-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
-            
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase mb-0.5 block">🏷️ Desconto (R$)</label>
-                <input type="number" step="0.01" value={desconto} onChange={(e) => setDesconto(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))} placeholder="0.00" className="w-full p-2 rounded bg-zinc-50 font-bold border border-zinc-300 outline-none text-zinc-800 text-xs shadow-inner" />
-              </div>
-              <div>
-                <div className="flex justify-between items-end mb-0.5">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase block">Vincular Cliente</label>
-                  <button type="button" onClick={() => setModalCliente(true)} className="text-[9px] font-black text-[#6A283A] bg-[#EED9D4]/50 px-1.5 py-0.5 rounded hover:bg-[#6A283A] hover:text-white transition-colors">➕ NOVO</button>
-                </div>
-                <select value={clienteSelecionado} onChange={(e) => setClienteSelecionado(e.target.value)} className="w-full p-2 rounded bg-zinc-50 font-bold border border-zinc-300 outline-none text-zinc-800 text-xs">
-                  <option value="">👤 Consumidor Final</option>
-                  {clientesDB.map(c => <option key={c.id} value={c.id}>{c.nome.substring(0, 15)}</option>)}
-                </select>
-              </div>
-            </div>
-
-            <div className="mb-2">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase mb-0.5 block">Forma de Pagamento</label>
-              <select value={pagamento} onChange={(e) => { setPagamento(e.target.value); setValorRecebido(''); }} className="w-full p-2 rounded bg-zinc-50 font-bold border border-zinc-300 outline-none text-zinc-800 text-xs focus:ring-1 focus:ring-[#6A283A]">
-                <option value="dinheiro">💵 Dinheiro</option>
-                <option value="pix">💠 PIX</option>
-                <option value="credito">💳 Cartão de Crédito</option>
-                <option value="debito">💳 Cartão de Débito</option>
-                <option value="venda_direta">📝 Venda Direta (Parcelado)</option>
-                <option value="multiplo">🔀 Múltiplas Formas (Dividir Conta)</option>
-              </select>
-            </div>
-
-            {pagamento === 'venda_direta' && (
-              <div className="mb-2 animate-in fade-in duration-200">
-                <label className="text-[10px] font-bold text-purple-700 uppercase mb-0.5 block">📝 Nota Interna / Parcelas (Fica oculto no cupom)</label>
-                <input type="text" value={observacaoDireta} onChange={(e) => setObservacaoDireta(e.target.value)} placeholder="Ex: Combinado 3x de R$ 50 no dia 10" className="w-full p-2 rounded bg-purple-50/50 text-purple-900 border-2 border-purple-200 font-bold text-xs outline-none focus:border-purple-500" />
-              </div>
-            )}
-
-            {pagamento === 'dinheiro' && (
-              <div className="grid grid-cols-2 gap-2 mb-2 animate-in fade-in duration-200 items-end">
-                <div>
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase mb-0.5 block">Recebido (R$)</label>
-                  <input type="number" step="0.01" value={valorRecebido} placeholder="Ex: 100" onChange={(e) => setValorRecebido(e.target.value ? Number(e.target.value) : '')} className="w-full p-2 rounded bg-white border-2 border-[#6A283A]/40 text-[#6A283A] font-black text-sm outline-none" />
-                </div>
-                {Number(valorRecebido) >= totalComDesconto && totalComDesconto > 0 && (
-                  <div className="h-[36px] px-2 bg-green-100 border border-green-400 rounded flex justify-between items-center">
-                    <span className="text-[10px] text-green-800 uppercase font-black">Troco:</span>
-                    <span className="text-sm font-black text-green-700">{formataMoeda(Number(valorRecebido) - totalComDesconto)}</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {pagamento === 'multiplo' && (
-              <div className="bg-zinc-50 p-2 rounded-lg border border-zinc-200 mb-2 grid grid-cols-2 gap-2 animate-in slide-in-from-top-1 duration-200">
-                <div>
-                  <label className="text-[9px] font-black text-zinc-600 block">💵 Dinheiro (R$)</label>
-                  <input type="number" step="0.01" value={valoresMultiplos.dinheiro} onChange={(e) => setValoresMultiplos({...valoresMultiplos, dinheiro: e.target.value})} className="w-full p-1.5 rounded border border-zinc-300 font-bold text-xs" placeholder="0.00" />
-                </div>
-                <div>
-                  <label className="text-[9px] font-black text-zinc-600 block">💠 PIX (R$)</label>
-                  <input type="number" step="0.01" value={valoresMultiplos.pix} onChange={(e) => setValoresMultiplos({...valoresMultiplos, pix: e.target.value})} className="w-full p-1.5 rounded border border-zinc-300 font-bold text-xs" placeholder="0.00" />
-                </div>
-                <div>
-                  <label className="text-[9px] font-black text-zinc-600 block">💳 Crédito (R$)</label>
-                  <input type="number" step="0.01" value={valoresMultiplos.credito} onChange={(e) => setValoresMultiplos({...valoresMultiplos, credito: e.target.value})} className="w-full p-1.5 rounded border border-zinc-300 font-bold text-xs" placeholder="0.00" />
-                </div>
-                <div>
-                  <label className="text-[9px] font-black text-zinc-600 block">💳 Débito (R$)</label>
-                  <input type="number" step="0.01" value={valoresMultiplos.debito} onChange={(e) => setValoresMultiplos({...valoresMultiplos, debito: e.target.value})} className="w-full p-1.5 rounded border border-zinc-300 font-bold text-xs" placeholder="0.00" />
-                </div>
-                
-                {/* 🚀 NOVO: CAMPO DE OBSERVAÇÃO PARA MÚLTIPLAS FORMAS */}
-                <div className="col-span-2">
-                  <label className="text-[9px] font-black text-zinc-600 block">📝 Observação da Divisão (Oculto no cupom)</label>
-                  <input type="text" value={observacaoMultipla} onChange={(e) => setObservacaoMultipla(e.target.value)} className="w-full p-1.5 rounded border border-zinc-300 font-bold text-xs bg-white focus:border-[#6A283A] outline-none" placeholder="Ex: Cartão da mãe, PIX da tia..." />
-                </div>
-
-                <div className="col-span-2 pt-1 border-t border-zinc-200 flex justify-between items-center text-[10px]">
-                  <span className="font-bold text-zinc-500">
-                    Falta: <strong className={faltaPagarMultiplo > 0 ? "text-red-600" : "text-green-600"}>{formataMoeda(Math.max(0, faltaPagarMultiplo))}</strong>
+      {abaAtiva === 'dre' && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300 space-y-6">
+          <div>
+            <h2 className="text-xl font-black text-blue-700">🧮 Demonstrativo de Resultados do Exercício (DRE)</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="border border-zinc-200 rounded-xl p-4 bg-zinc-50">
+              <h3 className="font-black text-sm uppercase text-zinc-700 border-b pb-2 tracking-wide mb-4">📅 Performance deste Mês</h3>
+              <div className="space-y-3 font-semibold text-sm">
+                <div className="flex justify-between text-zinc-600"><span>(+) Receita Bruta de Vendas (Loja + Direta)</span><span className="font-black text-zinc-800">{formataMoeda(totalVendidoMes)}</span></div>
+                <div className="flex justify-between text-orange-600 border-b pb-2"><span>(-) Custo da Mercadoria Vendida (CMV)</span><span className="font-black">({formataMoeda(custoMercadoriaMes)})</span></div>
+                <div className="flex justify-between text-zinc-800 font-black text-base bg-white p-2 rounded shadow-sm"><span>(=) LUCRO BRUTO INTEGRADO</span><span className="text-blue-700">{formataMoeda(totalVendidoMes - custoMercadoriaMes)}</span></div>
+                <div className="flex justify-between text-red-600 border-b pb-2 pt-2"><span>(-) Despesas Estruturais & Operacionais</span><span className="font-black">({formataMoeda(despesasOperacionaisMes)})</span></div>
+                <div className="flex justify-between text-white font-black text-lg bg-zinc-800 p-3 rounded-lg shadow-md">
+                  <span>(=) LUCRO LÍQUIDO REAL</span>
+                  <span className={(totalVendidoMes - custoMercadoriaMes - despesasOperacionaisMes) >= 0 ? "text-green-400" : "text-red-400"}>
+                    {formataMoeda(totalVendidoMes - custoMercadoriaMes - despesasOperacionaisMes)}
                   </span>
-                  {trocoMultiplo > 0 && (
-                    <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-black">Troco: {formataMoeda(trocoMultiplo)}</span>
-                  )}
                 </div>
               </div>
-            )}
-
-            <div className="flex items-stretch gap-2 mt-1">
-              <div className="flex-[1.4] bg-zinc-100 border border-zinc-200 rounded-lg p-1.5 flex flex-col justify-center items-center">
-                <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mb-0.5">A Pagar</span>
-                <span className="text-xl font-black text-[#6A283A] leading-none">{formataMoeda(totalComDesconto)}</span>
-                {Number(desconto) > 0 && <span className="text-[9px] text-zinc-400 line-through mt-0.5">{formataMoeda(totalCompra)}</span>}
-              </div>
-
-              <button 
-                onClick={handleFinalizarVenda} 
-                disabled={botaoDesabilitado} 
-                className="flex-[2] bg-[#6A283A] text-white font-black rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#521e2d] uppercase tracking-wider text-sm flex items-center justify-center transition-all"
-              >
-                ✅ Finalizar
-              </button>
             </div>
 
+            <div className="border border-zinc-200 rounded-xl p-4 bg-zinc-50">
+              <h3 className="font-black text-sm uppercase text-zinc-700 border-b pb-2 tracking-wide mb-4">🌍 Performance Histórica Total</h3>
+              <div className="space-y-3 font-semibold text-sm">
+                <div className="flex justify-between text-zinc-600"><span>(+) Receita Bruta Acumulada</span><span className="font-black text-zinc-800">{formataMoeda(totalVendidoSempre)}</span></div>
+                <div className="flex justify-between text-orange-600 border-b pb-2"><span>(-) Custo de Aquisição Total (CMV)</span><span className="font-black">({formataMoeda(custoMercadoriaTotal)})</span></div>
+                <div className="flex justify-between text-zinc-800 font-black text-base bg-white p-2 rounded shadow-sm"><span>(=) LUCRO BRUTO ACUMULADO</span><span className="text-blue-700">{formataMoeda(totalVendidoSempre - custoMercadoriaTotal)}</span></div>
+                <div className="flex justify-between text-red-600 border-b pb-2 pt-2"><span>(-) Despesas Estruturais Acumuladas</span><span className="font-black">({formataMoeda(despesasOperacionaisTotal)})</span></div>
+                <div className="flex justify-between text-white font-black text-lg bg-zinc-900 p-3 rounded-lg shadow-md">
+                  <span>(=) RESULTADO LÍQUIDO HISTÓRICO</span>
+                  <span className={(totalVendidoSempre - custoMercadoriaTotal - despesasOperacionaisTotal) >= 0 ? "text-green-400" : "text-red-400"}>
+                    {formataMoeda(totalVendidoSempre - custoMercadoriaTotal - despesasOperacionaisTotal)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {abaAtiva === 'giro' && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300">
+          <div className="mb-4">
+            <h2 className="text-xl font-black text-orange-600">📦 Inteligência de Giro de Estoque e Compras</h2>
+          </div>
+          <div className="overflow-x-auto rounded-lg border border-[#E0DDDD]">
+            <table className="w-full text-left">
+              <thead className="bg-orange-50 border-b border-orange-200">
+                <tr>
+                  <th className="p-3 text-xs font-bold text-orange-900">Produto</th>
+                  <th className="p-3 text-xs font-bold text-orange-900 text-center">Saídas Recentes</th>
+                  <th className="p-3 text-xs font-bold text-orange-900 text-center">Físico Atual</th>
+                  <th className="p-3 text-xs font-bold text-orange-900 text-center">Status de Giro</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100 font-semibold text-sm">
+                {listaProdutos.map((p: any) => {
+                  const qtdSaidas = vendasPorProduto[p.id] || 0;
+                  const estoqueAtual = Number(p.estoque || 0);
+                  let statusGiro = "🟢 Seguro / Confortável";
+                  let corGiro = "bg-green-100 text-green-800 border-green-300";
+                  if (estoqueAtual === 0) {
+                    statusGiro = "🔴 REPOR URGENTE";
+                    corGiro = "bg-red-100 text-red-800 border-red-300 animate-pulse";
+                  } else if (estoqueAtual <= 5 && qtdSaidas > 8) {
+                    statusGiro = "🔥 ALTO GIRO / CRÍTICO";
+                    corGiro = "bg-orange-100 text-orange-800 border-orange-300";
+                  }
+                  return (
+                    <tr key={p.id} className="hover:bg-zinc-50/50">
+                      <td className="p-3 text-zinc-900 font-black">{String(p.nome)}</td>
+                      <td className="p-3 text-center text-zinc-800">{qtdSaidas} un.</td>
+                      <td className={`p-3 text-center font-black ${estoqueAtual <= 3 ? 'text-red-600' : 'text-zinc-700'}`}>{estoqueAtual} un.</td>
+                      <td className="p-3 text-center"><span className={`px-3 py-1 rounded-full border text-[10px] font-black uppercase ${corGiro}`}>{statusGiro}</span></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {abaAtiva === 'etiquetas' && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300">
+          <div className="mb-4">
+            <h2 className="text-xl font-black text-emerald-700">🏷️ Gerador Digital de Etiquetas para Balcão</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            {listaProdutos.map((p: any) => (
+              <div key={p.id} className="p-4 border border-zinc-200 rounded-xl hover:border-emerald-500 transition-all bg-zinc-50 flex items-center justify-between gap-4">
+                <div className="truncate">
+                  <p className="font-black text-sm text-zinc-800 truncate" title={p.nome}>{String(p.nome)}</p>
+                  <p className="text-xs font-black text-emerald-600 mt-1">{formataMoeda(p.precoVenda)}</p>
+                </div>
+                <button onClick={() => dispararImpressaoEtiqueta(p)} className="bg-emerald-600 text-white text-xs font-black px-4 py-2.5 rounded-lg shadow-sm">🖨️ Imprimir</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ==================== 🚀 NOVA ABA: PASSO 5: METAS E COMISSÕES ==================== */}
+      {abaAtiva === 'comissoes' && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-4 mb-6">
+            <div>
+              <h2 className="text-xl font-black text-amber-600">🎖️ Programa de Metas e Comissões</h2>
+              <p className="text-zinc-500 text-sm mt-0.5">Acompanhe a performance da equipa e o bónus financeiro gerado pelas vendas deste mês.</p>
+            </div>
+            <div className="flex gap-3">
+              <div>
+                <label className="block text-[10px] font-black text-zinc-500 uppercase mb-1">Meta Global (R$)</label>
+                <input type="number" value={metaLoja} onChange={(e) => setMetaLoja(Number(e.target.value) || 1)} className="p-2 border border-zinc-300 rounded-lg text-sm font-black text-zinc-800 outline-none focus:border-amber-500 w-32" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-zinc-500 uppercase mb-1">Taxa Com. (%)</label>
+                <input type="number" value={taxaComissao} onChange={(e) => setTaxaComissao(Number(e.target.value) || 0)} className="p-2 border border-zinc-300 rounded-lg text-sm font-black text-zinc-800 outline-none focus:border-amber-500 w-24" />
+              </div>
+            </div>
           </div>
 
+          <div className="mb-8">
+            <div className="flex justify-between items-end mb-2">
+              <span className="text-sm font-bold text-zinc-600">Progresso da Meta Mensal</span>
+              <span className="font-black text-amber-600 text-lg">{progressoMeta.toFixed(1)}%</span>
+            </div>
+            <div className="w-full bg-zinc-100 rounded-full h-4 overflow-hidden shadow-inner">
+              <div className="bg-gradient-to-r from-amber-400 to-orange-500 h-4 rounded-full transition-all duration-1000" style={{ width: `${progressoMeta}%` }}></div>
+            </div>
+            <div className="flex justify-between text-xs text-zinc-400 mt-1 font-bold">
+              <span>{formataMoeda(totalVendidoMes)} Realizado</span>
+              <span>{formataMoeda(metaLoja)} Alvo</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Object.entries(vendasPorVendedor).map(([idVendedor, totalVendido]: [string, any]) => {
+              const valorVendido = Number(totalVendido);
+              const valorComissao = valorVendido * (taxaComissao / 100);
+              
+              return (
+                <div key={idVendedor} className="border border-amber-200 bg-amber-50/30 rounded-xl p-5 hover:shadow-md transition-shadow relative overflow-hidden">
+                  <div className="absolute top-0 right-0 bg-amber-200 text-amber-800 text-[10px] font-black px-3 py-1 rounded-bl-lg uppercase">
+                    ID Ref: {idVendedor}
+                  </div>
+                  <h3 className="font-black text-zinc-800 text-lg mb-4 mt-2">
+                    {idVendedor === 'Loja Principal' ? 'Sede / Balcão Fixo' : `Vendedor Parceiro #${idVendedor}`}
+                  </h3>
+                  
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-zinc-500 font-bold">Vendas Fechadas:</span>
+                      <span className="font-black text-zinc-800">{formataMoeda(valorVendido)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm border-t border-amber-200/50 pt-2">
+                      <span className="text-amber-700 font-black uppercase">Prémio a Pagar:</span>
+                      <span className="font-black text-amber-600 text-xl">{formataMoeda(valorComissao)}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            
+            {Object.keys(vendasPorVendedor).length === 0 && (
+              <div className="col-span-full p-8 text-center border-2 border-dashed border-zinc-200 rounded-xl">
+                <span className="text-3xl">💤</span>
+                <p className="text-zinc-400 font-bold mt-2">Nenhuma venda registada este mês para calcular comissões.</p>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
     </div>
   );
 }
