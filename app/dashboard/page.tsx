@@ -66,6 +66,25 @@ export default function DashboardPage() {
     }
   };
 
+  // 🚀 LÓGICA DE ENVIO DE COBRANÇA DO SALDO RESTANTE VIA WHATSAPP
+  const handleEnviarCobrancaWhatsApp = (venda: any, nomeCliente: string, notaInterna: string) => {
+    let telefone = '';
+    if (venda.idCliente && dados?.listaClientes) {
+      const cObj = dados.listaClientes.find((c: any) => Number(c.id) === Number(venda.idCliente));
+      if (cObj && cObj.telefone) {
+        telefone = cObj.telefone.replace(/\D/g, ''); // Mantém apenas os números do WhatsApp
+      }
+    }
+
+    if (telefone && !telefone.startsWith('55') && telefone.length >= 10) {
+      telefone = '55' + telefone; // Garante o código do Brasil caso falte
+    }
+
+    const textoCobranca = `*O MUNDO DOS PERFUMES* 🛍️\n\nOlá, *${nomeCliente}*! Tudo bem?\n\nPassando para lembrar do seu pagamento pendente no valor de *${formataMoeda(venda.total)}*.\n\n*Anotação do combinado:* _${notaInterna}_\n\nSe precisar da nossa chave PIX ou tiver qualquer dúvida sobre as parcelas, basta responder por aqui. Muito obrigado! ✨`;
+
+    window.open(`https://wa.me/${telefone}?text=${encodeURIComponent(textoCobranca)}`, '_blank');
+  };
+
   const formatarPagamentoTabela = (pag: string) => {
     if (!pag) return 'DINHEIRO';
     const pLow = pag.toLowerCase();
@@ -76,7 +95,6 @@ export default function DashboardPage() {
       if (pag.includes('obs=')) {
         const match = pag.match(/obs=([^;]+)/);
         const obsExtraida = match ? match[1] : '';
-        // Limpa a tag de pagamento para não poluir
         const limpaObs = obsExtraida.replace(';pago=true', '').replace('pago=true', '');
         return limpaObs ? `MÚLTIPLO 🔀 (${limpaObs})` : 'MÚLTIPLO 🔀';
       }
@@ -174,9 +192,6 @@ export default function DashboardPage() {
             th { background: #6A283A; color: #ffffff; padding: 10px 12px; font-weight: 700; text-transform: uppercase; font-size: 8pt; letter-spacing: 0.5px; text-align: left; }
             td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; color: #2d3748; vertical-align: middle; }
             tr:nth-child(even) { background: #f7fafc; }
-            .status-badge { display: inline-block; padding: 3px 8px; font-size: 7.5pt; font-weight: 800; border-radius: 4px; text-transform: uppercase; }
-            .status-concluida { background-color: #c6f6d5; color: #22543d; }
-            .status-cancelada { background-color: #fed7d7; color: #742a2a; }
             .right { text-align: right; }
             .bold { font-weight: bold; }
             .total-row { background: #fdf6f6 !important; font-size: 11pt; }
@@ -230,6 +245,17 @@ export default function DashboardPage() {
 
   if (carregando) return <div className="p-8 text-center text-[#6A283A] font-bold animate-pulse">Carregando Painel Geral...</div>;
 
+  if (!isAdmin) {
+    return (
+      <div className="bg-gradient-to-br from-[#6A283A] to-[#521e2d] text-white p-6 md:p-10 rounded-2xl border border-[#521e2d] shadow-2xl flex flex-col items-center justify-center text-center gap-6 animate-in fade-in zoom-in-95 mt-10 max-w-2xl mx-auto">
+        <div className="text-6xl mb-2">🛍️</div>
+        <h2 className="text-2xl md:text-3xl font-black uppercase tracking-wide text-[#EED9D4]">Olá, {usuarioNome}!</h2>
+        <p className="text-[#EED9D4]/80 text-base font-medium max-w-md leading-relaxed">Seu caixa está liberado para iniciar os atendimentos. Clique no botão abaixo para começar a registrar as vendas do dia.</p>
+        <Link href="/dashboard/caixa" className="w-full md:w-auto bg-[#EED9D4] text-[#6A283A] font-black py-4 px-10 rounded-xl hover:bg-white transition-all uppercase tracking-wider shadow-lg active:scale-95 mt-4">🛒 Abrir o Caixa (PDV)</Link>
+      </div>
+    );
+  }
+
   const listaVendas = dados?.listaVendas || [];
   const listaProdutos = dados?.listaProdutos || [];
   const listaClientes = dados?.listaClientes || [];
@@ -262,7 +288,7 @@ export default function DashboardPage() {
   const mesCredito = vendasMes.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'credito', v.total), 0);
   const mesDebito = vendasMes.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'debito', v.total), 0);
 
-  // 🚀 ATUALIZADO: Contas a ReceberAtivas (Ignora as que já foram quitadas com pago=true)
+  // 🚀 ATUALIZADO: Contas a Receber Ativas (Ignora as que já foram quitadas com pago=true)
   const hojeVendaDireta = vendasHoje.filter((v: any) => obterPagamento(v).startsWith('venda_direta') && !obterPagamento(v).includes('pago=true')).reduce((acc: number, v: any) => acc + v.total, 0);
   const mesVendaDireta = vendasMes.filter((v: any) => obterPagamento(v).startsWith('venda_direta') && !obterPagamento(v).includes('pago=true')).reduce((acc: number, v: any) => acc + v.total, 0);
   const totalVendaDiretaSempre = vendasValidas.filter((v: any) => obterPagamento(v).startsWith('venda_direta') && !obterPagamento(v).includes('pago=true')).reduce((acc: number, v: any) => acc + v.total, 0);
@@ -360,7 +386,7 @@ export default function DashboardPage() {
           📦 Passo 3: Giro de Estoque
         </button>
         <button onClick={() => setAbaAtiva('etiquetas')} className={`px-5 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'etiquetas' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>
-          🏷️ Passo 4: Etiquetas
+          🏷️ Passo 4: Labels / Etiquetas
         </button>
       </div>
 
@@ -482,12 +508,12 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ==================== 🚀 ABA CONTAS A RECEBER INTERATIVA ==================== */}
+      {/* ==================== ABA CONTAS A RECEBER INTERATIVA COM WHATSAPP ==================== */}
       {abaAtiva === 'receber' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300">
           <div className="mb-4">
             <h2 className="text-xl font-black text-purple-700">📑 Monitoramento Dinâmico de Contas a Receber</h2>
-            <p className="text-zinc-500 text-sm mt-0.5">Clique para dar baixa total, registrar amortizações e conferir notas fiscais.</p>
+            <p className="text-zinc-500 text-sm mt-0.5">Clique para dar baixa total, registrar amortizações e enviar cobranças automáticas por WhatsApp.</p>
           </div>
 
           <div className="overflow-x-auto rounded-lg border border-[#E0DDDD]">
@@ -505,7 +531,6 @@ export default function DashboardPage() {
                 {listaVendas
                   .filter((v: any) => v.status !== 'cancelada' && (obterPagamento(v).startsWith('venda_direta') || obterPagamento(v).includes('obs=')))
                   .map((venda: any) => {
-                    // Extrai e limpa a nota interna
                     let notaInterna = 'Nota Geral de Balcão';
                     if (venda.formaPagamento.includes('obs=')) {
                       const match = venda.formaPagamento.match(/obs=([^;]+)/);
@@ -521,7 +546,7 @@ export default function DashboardPage() {
                     return (
                       <tr key={venda.id} className={`transition-colors ${isQuitada ? 'bg-green-50/40 opacity-70' : 'hover:bg-purple-50/20'}`}>
                         <td className="p-3 text-sm text-zinc-500">{new Date(venda.data).toLocaleDateString('pt-BR')}</td>
-                        <td className="p-3 text-sm font-black text-zinc-800">{nomeCliente}</td>
+                        <td className="p-3 text-sm font-black text-zinc-800">{String(nomeCliente)}</td>
                         <td className={`p-3 text-sm font-medium ${isQuitada ? 'text-zinc-500 line-through' : 'text-purple-700 bg-purple-50/40'}`}>{limpaNota}</td>
                         <td className={`p-3 text-sm font-black ${isQuitada ? 'text-zinc-400 line-through' : 'text-purple-600'}`}>{formataMoeda(venda.total)}</td>
                         <td className="p-3 text-center">
@@ -529,11 +554,15 @@ export default function DashboardPage() {
                             <span className="bg-green-100 text-green-700 border border-green-300 px-3 py-1 rounded text-[10px] font-black uppercase tracking-wider">✅ Quitado</span>
                           ) : (
                             <div className="flex justify-center items-center gap-2">
-                              <button onClick={() => handleQuitarConta(venda.id, nomeCliente)} className="bg-green-600 text-white text-xs font-black px-3 py-1.5 rounded hover:bg-green-700 transition-colors uppercase shadow-sm">
+                              <button onClick={() => handleQuitarConta(venda.id, String(nomeCliente))} className="bg-green-600 text-white text-xs font-black px-3 py-1.5 rounded hover:bg-green-700 transition-colors uppercase shadow-sm">
                                 💰 Quitar
                               </button>
                               <button onClick={() => handleAlterarNota(venda.id, limpaNota)} className="bg-purple-100 text-purple-700 text-xs font-bold px-3 py-1.5 rounded hover:bg-purple-200 transition-colors uppercase">
                                 📝 Notas
+                              </button>
+                              {/* 🚀 BOTÃO ADICIONADO: Disparo direto do lembrete parametrizado para o WhatsApp */}
+                              <button onClick={() => handleEnviarCobrancaWhatsApp(venda, String(nomeCliente), limpaNota)} className="bg-[#25D366] text-white text-xs font-black px-3 py-1.5 rounded hover:bg-[#128C7E] transition-colors uppercase flex items-center gap-1 shadow-sm">
+                                <span>📱</span> Cobrar
                               </button>
                             </div>
                           )}
@@ -547,7 +576,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ABA DRE */}
+      {/* ABA DRE MANTIDA INTEGRALMENTE */}
       {abaAtiva === 'dre' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300 space-y-6">
           <div>
@@ -590,7 +619,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ABA GIRO */}
+      {/* ABA GIRO MANTIDA INTEGRALMENTE */}
       {abaAtiva === 'giro' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300">
           <div className="mb-4">
@@ -637,7 +666,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ABA ETIQUETAS */}
+      {/* ABA ETIQUETAS MANTIDA INTEGRALMENTE */}
       {abaAtiva === 'etiquetas' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300">
           <div className="mb-4">
