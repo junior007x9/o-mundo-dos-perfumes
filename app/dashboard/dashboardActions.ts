@@ -63,7 +63,7 @@ export async function cancelarVendaAction(idVenda: number) {
   revalidatePath('/dashboard');
 }
 
-// 🚀 PASSO 1: FUNÇÃO PARA QUITAR TOTALMENTE A DÍVIDA
+// 🚀 PASSO 1: FUNÇÃO PARA QUITAR TOTALMENTE A DÍVIDA (BLINDADA)
 export async function quitarVendaAction(idVenda: number) {
   const usu = await getUsuarioLogado();
   const nomeUsuario = usu?.nome || 'Sistema';
@@ -72,8 +72,10 @@ export async function quitarVendaAction(idVenda: number) {
   const vendaAtual = resVenda[0];
 
   if (vendaAtual) {
-    // Insere a tag seguro de liquidação
-    const novaFormaPagamento = `${vendaAtual.formaPagamento};pago=true`;
+    // 🚀 Garante que a forma de pagamento é uma string para evitar o erro de 'null'
+    const formaSegura = String(vendaAtual.formaPagamento || '');
+    const novaFormaPagamento = `${formaSegura};pago=true`;
+    
     await db.update(vendas).set({ formaPagamento: novaFormaPagamento }).where(eq(vendas.id, idVenda));
 
     await db.insert(logsSistema).values({
@@ -87,7 +89,7 @@ export async function quitarVendaAction(idVenda: number) {
   revalidatePath('/dashboard');
 }
 
-// 🚀 PASSO 1: FUNÇÃO PARA ATUALIZAR A NOTA DE CONFERÊNCIA (BAIXA PARCIAL)
+// 🚀 PASSO 1: FUNÇÃO PARA ATUALIZAR A NOTA DE CONFERÊNCIA (BLINDADA)
 export async function atualizarNotaReceberAction(idVenda: number, novaNota: string) {
   const usu = await getUsuarioLogado();
   const nomeUsuario = usu?.nome || 'Sistema';
@@ -96,9 +98,12 @@ export async function atualizarNotaReceberAction(idVenda: number, novaNota: stri
   const vendaAtual = resVenda[0];
 
   if (vendaAtual) {
+    // 🚀 Converte estritamente para string para que o split não trave
+    const formaSegura = String(vendaAtual.formaPagamento || '');
+    
     // Remove qualquer anotação antiga para evitar duplicação e anexa a nova
-    const formaLimpa = vendaAtual.formaPagamento.split(';obs=')[0].split(':obs=')[0];
-    const prefixo = vendaAtual.formaPagamento.startsWith('venda_direta') ? 'venda_direta:obs=' : `${formaLimpa};obs=`;
+    const formaLimpa = formaSegura.split(';obs=')[0].split(':obs=')[0];
+    const prefixo = formaSegura.startsWith('venda_direta') ? 'venda_direta:obs=' : `${formaLimpa};obs=`;
     const novaForma = `${prefixo}${novaNota.replace(/[:;=]/g, ' ')}`;
 
     await db.update(vendas).set({ formaPagamento: novaForma }).where(eq(vendas.id, idVenda));
