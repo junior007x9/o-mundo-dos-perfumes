@@ -16,7 +16,7 @@ export default function DashboardPage() {
   const [logs, setLogs] = useState<any[]>([]);
 
   // 🚀 Controle das abas gerenciais (Passos 1 ao 4)
-  const [abaAtiva, setAbaAtiva] = useState('geral');
+  const [abaAtiva, setAbaAtiva] = useState('geral'); 
 
   useEffect(() => {
     carregar();
@@ -75,6 +75,41 @@ export default function DashboardPage() {
   };
 
   const formataMoeda = (valor: number) => valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  // 🚀 FUNÇÃO DO PASSO 4: Imprimir etiquetas
+  const dispararImpressaoEtiqueta = (produto: any) => {
+    const popup = window.open('', '_blank', 'width=400,height=400');
+    if (!popup) return alert('Por favor, autorize pop-ups para gerar a etiqueta!');
+    
+    popup.document.write(`
+      <html>
+        <head>
+          <style>
+            body { font-family: 'Courier New', monospace; padding: 20px; text-align: center; color: #000; }
+            .etiqueta-box { border: 2px dashed #000; padding: 15px; border-radius: 8px; max-width: 280px; margin: 0 auto; }
+            .empresa { font-size: 9pt; font-weight: bold; text-transform: uppercase; margin-bottom: 4px; }
+            .nome { font-size: 11pt; font-weight: bold; margin: 8px 0; height: 32px; overflow: hidden; }
+            .marca { font-size: 8pt; color: #555; font-weight: bold; text-transform: uppercase; }
+            .preco { font-size: 18pt; font-weight: 900; margin: 10px 0; }
+            .barras-simuladas { background: #000; height: 35px; width: 100%; margin: 8px auto; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 7pt; letter-spacing: 2px; }
+            .codigo { font-size: 8pt; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <div class="etiqueta-box">
+            <div class="empresa">O Mundo dos Perfumes</div>
+            <div class="nome">${produto.nome}</div>
+            <div class="marca">${produto.marca || 'FRAGRÂNCIA'}</div>
+            <div class="preco">${formataMoeda(produto.precoVenda)}</div>
+            <div class="barras-simuladas">|||||||||||||||||||||||||||||||||</div>
+            <div class="codigo">${produto.codigoBarras || 'SEM CÓDIGO'}</div>
+          </div>
+          <script>window.onload = function() { window.print(); setTimeout(() => window.close(), 600); }</script>
+        </body>
+      </html>
+    `);
+    popup.document.close();
+  };
 
   const exportarParaExcel = () => {
     if (!dados || !dados.listaVendas || dados.listaVendas.length === 0) return;
@@ -157,6 +192,7 @@ export default function DashboardPage() {
             .card-value { font-size: 16pt; font-weight: 900; color: #2d3748; margin-top: 5px; }
             table { width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 9.5pt; }
             th { background: #6A283A; color: #ffffff; padding: 10px 12px; font-weight: 700; text-transform: uppercase; font-size: 8pt; letter-spacing: 0.5px; text-align: left; }
+            th.right { text-align: right; }
             td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; color: #2d3748; vertical-align: middle; }
             tr:nth-child(even) { background: #f7fafc; }
             .linha-cancelada { background: #fff5f5 !important; }
@@ -194,46 +230,13 @@ export default function DashboardPage() {
     popup.document.close();
   };
 
-  // 🚀 PASSO 4: Emissor de etiquetas estruturadas para o balcão
-  const dispararImpressaoEtiqueta = (produto: any) => {
-    const popup = window.open('', '_blank', 'width=400,height=400');
-    if (!popup) return alert('Por favor, autorize pop-ups para gerar a etiqueta!');
-    popup.document.write(`
-      <html>
-        <head>
-          <style>
-            body { font-family: 'Courier New', monospace; padding: 15px; text-align: center; color: #000; }
-            .box { border: 2px dashed #000; padding: 12px; border-radius: 6px; max-width: 250px; margin: 0 auto; }
-            .brand { font-size: 8pt; font-weight: bold; text-transform: uppercase; color: #555; }
-            .title { font-size: 11pt; font-weight: bold; margin: 6px 0; height: 32px; overflow: hidden; }
-            .price { font-size: 16pt; font-weight: 900; margin: 6px 0; }
-            .bar { background: #000; height: 30px; width: 100%; margin: 6px auto; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 6pt; letter-spacing: 2px; }
-          </style>
-        </head>
-        <body>
-          <div class="box">
-            <div class="brand">${produto.marca || 'O MUNDO DOS PERFUMES'}</div>
-            <div class="title">${produto.nome}</div>
-            <div class="price">${formataMoeda(produto.precoVenda)}</div>
-            <div class="bar">|||||||||||||||||||||||||||||||</div>
-            <div style="font-size: 8pt; font-weight: bold;">${produto.codigoBarras || 'SEM CÓDIGO'}</div>
-          </div>
-          <script>window.onload = function() { window.print(); setTimeout(() => window.close(), 600); }</script>
-        </body>
-      </html>
-    `);
-    popup.document.close();
-  };
-
   if (carregando) return <div className="p-8 text-center text-[#6A283A] font-bold animate-pulse">Carregando Painel Geral...</div>;
 
   if (!isAdmin) {
     return (
-      <div className="bg-gradient-to-br from-[#6A283A] to-[#521e2d] text-white p-6 md:p-10 rounded-2xl border border-[#521e2d] shadow-2xl flex flex-col items-center justify-center text-center gap-6 animate-in fade-in zoom-in-95 mt-10 max-w-2xl mx-auto">
-        <div className="text-6xl mb-2">🛍️</div>
-        <h2 className="text-2xl md:text-3xl font-black uppercase tracking-wide text-[#EED9D4]">Olá, {usuarioNome}!</h2>
-        <p className="text-[#EED9D4]/80 text-base font-medium max-w-md leading-relaxed">Seu caixa está liberado para iniciar os atendimentos. Clique no botão abaixo para começar a registrar as vendas do dia.</p>
-        <Link href="/dashboard/caixa" className="w-full md:w-auto bg-[#EED9D4] text-[#6A283A] font-black py-4 px-10 rounded-xl hover:bg-white transition-all uppercase tracking-wider shadow-lg active:scale-95 mt-4">🛒 Abrir o Caixa (PDV)</Link>
+      <div className="bg-gradient-to-br from-[#6A283A] to-[#521e2d] text-white p-6 md:p-10 rounded-2xl text-center mt-10 max-w-2xl mx-auto">
+        <h2 className="text-2xl font-black uppercase text-[#EED9D4]">Olá, {usuarioNome}!</h2>
+        <Link href="/dashboard/caixa" className="inline-block bg-[#EED9D4] text-[#6A283A] font-black py-4 px-10 rounded-xl mt-4">🛒 Abrir o Caixa (PDV)</Link>
       </div>
     );
   }
@@ -257,23 +260,28 @@ export default function DashboardPage() {
   const produtosBaixoEstoque = listaProdutos.filter((p: any) => p.estoque > 0 && p.estoque <= 5);
   const produtosSemEstoque = listaProdutos.filter((p: any) => p.estoque === 0);
 
+  // 🚀 CORREÇÃO AQUI: Função obterPagamento declarada antes de ser utilizada!
+  const obterPagamento = (v: any) => String(v.formaPagamento || '').toLowerCase();
+
+  // Canais tradicionais
+  const hojeDinheiro = vendasHoje.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'dinheiro', v.total), 0);
   const hojePix = vendasHoje.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'pix', v.total), 0);
   const hojeCredito = vendasHoje.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'credito', v.total), 0);
   const hojeDebito = vendasHoje.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'debito', v.total), 0);
-  const hojeDinheiro = vendasHoje.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'dinheiro', v.total), 0);
 
+  const mesDinheiro = vendasMes.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'dinheiro', v.total), 0);
   const mesPix = vendasMes.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'pix', v.total), 0);
   const mesCredito = vendasMes.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'credito', v.total), 0);
   const mesDebito = vendasMes.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'debito', v.total), 0);
-  const mesDinheiro = vendasMes.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'dinheiro', v.total), 0);
 
+  // Canais estruturados de Venda Direta
   const hojeVendaDireta = vendasHoje.filter((v: any) => obterPagamento(v).startsWith('venda_direta')).reduce((acc: number, v: any) => acc + v.total, 0);
   const mesVendaDireta = vendasMes.filter((v: any) => obterPagamento(v).startsWith('venda_direta')).reduce((acc: number, v: any) => acc + v.total, 0);
   const totalVendaDiretaSempre = vendasValidas.filter((v: any) => obterPagamento(v).startsWith('venda_direta')).reduce((acc: number, v: any) => acc + v.total, 0);
 
   function obterValorPorForma(forma: string, tipo: string, totalVenda: number) {
     if (!forma) return 0;
-    const f = forma.toLowerCase();
+    const f = String(forma).toLowerCase();
     if (f.startsWith('multiplo:')) {
       const partes = f.replace('multiplo:', '').split(';');
       for (const p of partes) {
@@ -287,6 +295,7 @@ export default function DashboardPage() {
     return 0;
   }
 
+  // Lógica de custo de mercadoria (CMV) blindada
   const idsVendasValidas = new Set(vendasValidas.map((v: any) => v.id));
   const idsVendasMes = new Set(vendasMes.map((v: any) => v.id));
   
@@ -304,7 +313,6 @@ export default function DashboardPage() {
       const itemQtd = Number(item.quantidade || 0);
 
       vendasPorProduto[itemId] = (vendasPorProduto[itemId] || 0) + itemQtd;
-      
       const custoUnitario = Number(custoProdutoMap.get(itemId) || 0);
       
       custoMercadoriaTotal += (custoUnitario * itemQtd);
@@ -325,7 +333,7 @@ export default function DashboardPage() {
   const valorPotencialAlcancado = listaProdutos.reduce((acc: number, p: any) => acc + (Number(p.precoVenda || 0) * Number(p.estoque || 0)), 0);
   const capitalInvestidoEstoque = listaProdutos.reduce((acc: number, p: any) => acc + (Number(p.precoCusto || 0) * (p.estoque > 0 ? Number(p.estoque) : 0)), 0);
 
-  // 🚀 LÓGICAS DOS NOVOS COMPONENTES (PASSOS 1 A 3)
+  // Filtros das despesas operacionais para o DRE (Passo 2)
   const despesasOperacionaisMes = listaDespesas
     .filter((d: any) => d.categoria !== 'Estoque / Mercadoria' && d.data && d.data.startsWith(mesAtual))
     .reduce((acc: number, d: any) => acc + Number(d.valor || 0), 0);
@@ -334,25 +342,27 @@ export default function DashboardPage() {
     .filter((d: any) => d.categoria !== 'Estoque / Mercadoria')
     .reduce((acc: number, d: any) => acc + Number(d.valor || 0), 0);
 
+  // Mapeamento de clientes para exibição nominal rápida
   const clienteNomeMap = new Map(listaClientes.map((c: any) => [c.id, c.nome]));
 
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
       
-      <div className="bg-gradient-to-r from-[#EED9D4]/40 to-white p-5 rounded-2xl border border-[#6A283A]/20 shadow-sm flex flex-col sm:flex-row items-start sm:items-center gap-4 transition-all hover:shadow-md">
-        <div className="bg-[#6A283A] p-3 rounded-full animate-bounce shadow-lg border-2 border-white flex-shrink-0">
-          <span className="text-2xl">🛡️</span>
-        </div>
-        <div>
-          <h3 className="font-black text-[#6A283A] text-lg uppercase tracking-wide">Bem-vindo, {usuarioNome}!</h3>
-          <p className="text-zinc-600 text-sm mt-1 font-medium leading-relaxed">Controle total ativado. Seu relatório rastreia faturamento de estoque, <strong>PIX, Crédito, Débito, Dinheiro</strong> e os <strong>Logs de Segurança</strong>.</p>
+      {/* BANNER RECEPTIVO PRINCIPAL */}
+      <div className="bg-gradient-to-r from-[#EED9D4]/40 to-white p-5 rounded-2xl border border-[#6A283A]/20 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="bg-[#6A283A] p-3 rounded-full shadow-lg border-2 border-white text-white">🛡️</div>
+          <div>
+            <h3 className="font-black text-[#6A283A] text-lg uppercase tracking-wide">Módulo de Governança Avançada</h3>
+            <p className="text-zinc-600 text-sm mt-0.5 font-medium">Controle automatizado de carteira, P&L estruturado, fluxo de mercadoria e rotulagem.</p>
+          </div>
         </div>
       </div>
 
-      {/* 🚀 NOVO MENU DE ABAS TOTALMENTE INTEGRADO (PASSOS 1 AO 4) */}
-      <div className="flex overflow-x-auto gap-2 border-b border-zinc-200 pb-px">
+      {/* MENU SELETOR DE ABAS */}
+      <div className="flex overflow-x-auto gap-2 border-b border-zinc-200 pb-px scrollbar-none">
         <button onClick={() => setAbaAtiva('geral')} className={`px-5 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'geral' ? 'border-[#6A283A] text-[#6A283A]' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>
-          📊 Dashboard Principal
+          📊 Painel Geral
         </button>
         <button onClick={() => setAbaAtiva('receber')} className={`px-5 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'receber' ? 'border-purple-600 text-purple-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>
           📝 Passo 1: Contas a Receber
@@ -368,9 +378,9 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      {/* ==================== ABA PRINCIPAL ==================== */}
+      {/* ABA 0: PAINEL GERAL TRADICIONAL */}
       {abaAtiva === 'geral' && (
-        <div className="space-y-6 md:space-y-8 animate-in fade-in duration-300">
+        <div className="space-y-6 animate-in fade-in duration-300">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-[#6A283A] flex flex-col justify-between">
               <div>
@@ -400,11 +410,10 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-purple-600 transition-transform hover:scale-105 flex flex-col justify-between">
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-purple-600 flex flex-col justify-between">
               <div>
-                <h3 className="text-xs md:text-sm font-bold text-zinc-500 uppercase tracking-wider">Total Venda Direta (Histórico)</h3>
+                <h3 className="text-xs md:text-sm font-bold text-zinc-500 uppercase tracking-wider">Total Venda Direta</h3>
                 <p className="text-2xl font-black text-purple-600 mt-2">{formataMoeda(totalVendaDiretaSempre)}</p>
-                <p className="text-[10px] text-zinc-400 mt-0.5">Controle de carteira de clientes fixos</p>
               </div>
               <div className="mt-4 pt-2 border-t border-zinc-100 text-xs text-zinc-500 font-bold flex justify-between">
                 <span>Balcão Loja:</span>
@@ -412,53 +421,12 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-orange-500 transition-transform hover:scale-105 flex flex-col justify-between">
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-orange-500 flex flex-col justify-between">
               <div>
                 <h3 className="text-xs md:text-sm font-bold text-zinc-500 uppercase tracking-wider">Custos c/ Mercadoria (Mês)</h3>
                 <p className="text-2xl font-black text-orange-600 mt-2">{formataMoeda(custoMercadoriaMes)}</p>
-                <p className="text-[10px] text-zinc-400 mt-0.5">Preço de custo dos itens vendidos</p>
               </div>
               <p className="text-xs text-zinc-400 mt-4 pt-2 border-t border-zinc-100">Custo Histórico Total: <strong>{formataMoeda(custoMercadoriaTotal)}</strong></p>
-            </div>
-
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-blue-600 transition-transform hover:scale-105">
-              <h3 className="text-xs md:text-sm font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1">📦 Cadastrados</h3>
-              <p className="text-2xl font-black text-zinc-800 mt-2">{totalProdutosCadastrados}</p>
-              <p className="text-xs text-zinc-400 mt-2">Tipos de produtos na loja</p>
-            </div>
-
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-emerald-500 transition-transform hover:scale-105 flex flex-col justify-between">
-              <div>
-                <h3 className="text-xs md:text-sm font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1">💰 Meta em Estoque</h3>
-                <p className="text-2xl font-black text-emerald-600 mt-2">{formataMoeda(valorPotencialAlcancado)}</p>
-              </div>
-              <p className="text-xs text-zinc-400 mt-4 pt-2 border-t border-zinc-100">Capital Investido Atual: <strong>{formataMoeda(capitalInvestidoEstoque)}</strong></p>
-            </div>
-
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-zinc-800 transition-transform hover:scale-105">
-              <h3 className="text-xs md:text-sm font-bold text-zinc-500 uppercase tracking-wider">Mais Vendido 🏆</h3>
-              <p className="text-lg font-black text-zinc-800 mt-2 truncate">
-                {topProduto ? topProduto.nome : 'Nenhuma venda'}
-              </p>
-              <p className="text-xs text-zinc-400 mt-2">{topProduto ? `${topProduto.qtdVendida} un. vendidas` : 'Aguardando dados'}</p>
-            </div>
-
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-green-600 transition-transform hover:scale-105">
-              <h3 className="text-xs md:text-sm font-bold text-zinc-500 uppercase tracking-wider">Faturamento Total</h3>
-              <p className="text-2xl font-black text-green-600 mt-2">{formataMoeda(totalVendidoSempre)}</p>
-              <p className="text-xs text-zinc-400 mt-2">Líquido de cancelamentos</p>
-            </div>
-
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-indigo-500 transition-transform hover:scale-105">
-              <h3 className="text-xs md:text-sm font-bold text-zinc-500 uppercase tracking-wider">Total de Clientes</h3>
-              <p className="text-2xl font-black text-zinc-800 mt-2">{listaClientes.length}</p>
-              <p className="text-xs text-zinc-400 mt-2">Na base de dados</p>
-            </div>
-
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-red-200 border-l-4 border-l-red-500 transition-transform hover:scale-105">
-              <h3 className="text-xs md:text-sm font-bold text-zinc-500 uppercase tracking-wider">Alerta de Estoque</h3>
-              <p className="text-2xl font-black text-red-600 mt-2">{produtosSemEstoque.length} <span className="text-lg">zerados</span></p>
-              <p className="text-xs text-red-400 font-medium mt-2">{produtosBaixoEstoque.length} produto(s) acabando</p>
             </div>
           </div>
 
@@ -467,18 +435,16 @@ export default function DashboardPage() {
               <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-4">
                 <div>
                   <h2 className="text-xl font-bold text-[#6A283A]">Histórico de Vendas</h2>
-                  <p className="text-xs font-semibold text-zinc-500 mt-0.5">
-                    Total Geral Acumulado: <span className="text-green-600 font-black">{formataMoeda(totalVendidoSempre)}</span>
-                  </p>
+                  <p className="text-xs font-semibold text-zinc-500 mt-0.5">Total Acumulado: <span className="text-green-600 font-black">{formataMoeda(totalVendidoSempre)}</span></p>
                 </div>
                 {listaVendas.length > 0 && (
                   <div className="flex items-center gap-2">
-                    <button onClick={exportarParaExcel} className="bg-green-700 text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-green-800 transition-all flex items-center justify-center gap-2 active:scale-95 shadow-sm uppercase tracking-wider">📥 Excel</button>
-                    <button onClick={exportarParaPDF} className="bg-[#6A283A] text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-[#521e2d] transition-all flex items-center justify-center gap-2 active:scale-95 shadow-sm uppercase tracking-wider">📄 PDF</button>
+                    <button onClick={exportarParaExcel} className="bg-green-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm uppercase tracking-wider">📥 Excel</button>
+                    <button onClick={exportarParaPDF} className="bg-[#6A283A] text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm uppercase tracking-wider">📄 PDF</button>
                   </div>
                 )}
               </div>
-              <div className="overflow-x-auto rounded-lg border border-[#E0DDDD]/60 flex-1 max-h-[480px] overflow-y-auto">
+              <div className="overflow-x-auto rounded-lg border border-[#E0DDDD]/60 flex-1 max-h-[400px] overflow-y-auto">
                 <table className="w-full text-left whitespace-nowrap">
                   <thead className="bg-zinc-50 sticky top-0 border-b border-[#E0DDDD] z-10">
                     <tr>
@@ -518,7 +484,7 @@ export default function DashboardPage() {
                   <tbody>
                     {produtosSemEstoque.map((produto: any) => (
                       <tr key={produto.id} className="border-b border-[#E0DDDD]/50 hover:bg-red-50 transition-colors">
-                        <td className="p-3 text-sm font-bold text-zinc-800 line-clamp-1" title={produto.nome}>{produto.nome}</td>
+                        <td className="p-3 text-sm font-bold text-zinc-800 line-clamp-1">{produto.nome}</td>
                         <td className="p-3 text-sm font-black text-red-600">Esgotado</td>
                       </tr>
                     ))}
@@ -530,116 +496,151 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ==================== ABA 1: PASSO 1: CONTAS A RECEBER ==================== */}
+      {/* ABA 1: PASSO 1: CONTAS A RECEBER */}
       {abaAtiva === 'receber' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300">
           <div className="mb-4">
             <h2 className="text-xl font-black text-purple-700">📑 Monitoramento de Contas a Receber</h2>
-            <p className="text-zinc-500 text-sm mt-0.5">Histórico unificado de parcelamentos ativos, divisões de conta e venda direta.</p>
+            <p className="text-zinc-500 text-sm mt-0.5">Controle completo da sua carteira de parcelamentos e acordos com clientes fixos.</p>
           </div>
+
           <div className="overflow-x-auto rounded-lg border border-[#E0DDDD]">
             <table className="w-full text-left whitespace-nowrap">
               <thead className="bg-purple-50 border-b border-purple-200">
                 <tr>
                   <th className="p-3 text-xs font-bold text-purple-900">Data</th>
-                  <th className="p-3 text-xs font-bold text-purple-900">Cliente</th>
-                  <th className="p-3 text-xs font-bold text-purple-900">Observação / Nota de Auditoria</th>
-                  <th className="p-3 text-xs font-bold text-purple-900">Valor Acordado</th>
+                  <th className="p-3 text-xs font-bold text-purple-900">Cliente Responsável</th>
+                  <th className="p-3 text-xs font-bold text-purple-900">Nota de Conferência (Oculta ao Cliente)</th>
+                  <th className="p-3 text-xs font-bold text-purple-900">Montante devedor</th>
                   <th className="p-3 text-xs font-bold text-purple-900 text-center">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-100 font-semibold text-sm">
+              <tbody className="divide-y divide-zinc-100">
                 {listaVendas
                   .filter((v: any) => v.status !== 'cancelada' && (obterPagamento(v).startsWith('venda_direta') || obterPagamento(v).includes('obs=')))
                   .map((venda: any) => {
-                    let notaInterna = 'Nota de Conferência Interna';
+                    let notaInterna = 'Nota Geral de Balcão';
                     if (venda.formaPagamento.includes('obs=')) {
                       const match = venda.formaPagamento.match(/obs=([^;]+)/);
                       notaInterna = match ? match[1] : notaInterna;
                     } else if (venda.formaPagamento.includes(':obs=')) {
                       notaInterna = venda.formaPagamento.split(':obs=')[1];
                     }
-                    const nomeCli = clienteNomeMap.get(venda.idCliente) || 'Consumidor Final (Fixos)';
+
+                    const nomeCliente = clienteNomeMap.get(venda.idCliente) || 'Cliente Fixo Não Identificado';
+
                     return (
-                      <tr key={venda.id} className="hover:bg-purple-50/20">
-                        <td className="p-3 text-zinc-500">{new Date(venda.data).toLocaleDateString('pt-BR')}</td>
-                        <td className="p-3 text-zinc-900 font-black">{nomeCli}</td>
-                        <td className="p-3 text-purple-800 bg-purple-50/40">{notaInterna}</td>
-                        <td className="p-3 text-purple-600 font-black">{formataMoeda(venda.total)}</td>
-                        <td className="p-3 text-center"><span className="bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded text-[10px] font-black uppercase">Em Aberto</span></td>
+                      <tr key={venda.id} className="hover:bg-purple-50/20 transition-colors">
+                        <td className="p-3 text-sm text-zinc-600">{new Date(venda.data).toLocaleDateString('pt-BR')}</td>
+                        <td className="p-3 text-sm font-black text-zinc-800">{nomeCliente}</td>
+                        <td className="p-3 text-sm font-medium text-purple-700 bg-purple-50/40">{notaInterna}</td>
+                        <td className="p-3 text-sm font-black text-purple-600">{formataMoeda(venda.total)}</td>
+                        <td className="p-3 text-center">
+                          <span className="bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider">Aguardando Baixa</span>
+                        </td>
                       </tr>
                     );
                   })}
+                {listaVendas.filter((v: any) => v.status !== 'cancelada' && (obterPagamento(v).startsWith('venda_direta') || obterPagamento(v).includes('obs='))).length === 0 && (
+                  <tr><td colSpan={5} className="p-8 text-center text-zinc-400">Nenhum parcelamento ou venda direta ativa no momento.</td></tr>
+                )}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      {/* ==================== ABA 2: PASSO 2: DRE GERENCIAL ==================== */}
+      {/* ABA 2: PASSO 2: DRE GERENCIAL */}
       {abaAtiva === 'dre' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300 space-y-6">
           <div>
             <h2 className="text-xl font-black text-blue-700">🧮 Demonstrativo de Resultados do Exercício (DRE)</h2>
-            <p className="text-zinc-500 text-sm mt-0.5">Visão financeira estruturada subtraindo CMV e despesas operacionais do faturamento bruto.</p>
+            <p className="text-zinc-500 text-sm mt-0.5">Relatório contábil gerencial cruzando faturamento bruto, custos logísticos e operacionais.</p>
           </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="border border-zinc-200 rounded-xl p-5 bg-zinc-50 space-y-3 font-semibold text-sm">
-              <h3 className="font-black text-sm uppercase text-zinc-700 border-b pb-2 mb-2">📅 Mês Vigente</h3>
-              <div className="flex justify-between text-zinc-600"><span>(+) Receita Bruta Total</span><span>{formataMoeda(totalVendidoMes)}</span></div>
-              <div className="flex justify-between text-orange-600 border-b pb-2"><span>(-) Custo de Mercadoria (CMV)</span><span>({formataMoeda(custoMercadoriaMes)})</span></div>
-              <div className="flex justify-between text-zinc-800 font-black bg-white p-2 rounded"><span>(=) LUCRO BRUTO INTEGRADO</span><span className="text-blue-700">{formataMoeda(totalVendidoMes - custoMercadoriaMes)}</span></div>
-              <div className="flex justify-between text-red-600 border-b pb-2 pt-1"><span>(-) Despesas Operacionais Gerais</span><span>({formataMoeda(despesasOperacionaisMes)})</span></div>
-              <div className="flex justify-between text-white font-black text-base bg-zinc-800 p-3 rounded-lg"><span>(=) LUCRO LÍQUIDO REAL</span><span className="text-green-400">{formataMoeda(totalVendidoMes - custoMercadoriaMes - despesasOperacionaisMes)}</span></div>
+            <div className="border border-zinc-200 rounded-xl p-4 bg-zinc-50">
+              <h3 className="font-black text-sm uppercase text-zinc-700 border-b pb-2 tracking-wide mb-4">📅 Performance deste Mês</h3>
+              <div className="space-y-3 font-semibold text-sm">
+                <div className="flex justify-between text-zinc-600"><span>(+) Receita Bruta de Vendas (Loja + Direta)</span><span className="font-black text-zinc-800">{formataMoeda(totalVendidoMes)}</span></div>
+                <div className="flex justify-between text-orange-600 border-b pb-2"><span>(-) Custo da Mercadoria Vendida (CMV)</span><span className="font-black">({formataMoeda(custoMercadoriaMes)})</span></div>
+                <div className="flex justify-between text-zinc-800 font-black text-base bg-white p-2 rounded shadow-sm"><span>(=) LUCRO BRUTO INTEGRADO</span><span className="text-blue-700">{formataMoeda(totalVendidoMes - custoMercadoriaMes)}</span></div>
+                <div className="flex justify-between text-red-600 border-b pb-2 pt-2"><span>(-) Despesas Estruturais & Operacionais</span><span className="font-black">({formataMoeda(despesasOperacionaisMes)})</span></div>
+                <div className="flex justify-between text-white font-black text-lg bg-zinc-800 p-3 rounded-lg shadow-md">
+                  <span>(=) LUCRO LÍQUIDO REAL</span>
+                  <span className={(totalVendidoMes - custoMercadoriaMes - despesasOperacionaisMes) >= 0 ? "text-green-400" : "text-red-400"}>
+                    {formataMoeda(totalVendidoMes - custoMercadoriaMes - despesasOperacionaisMes)}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="border border-zinc-200 rounded-xl p-5 bg-zinc-50 space-y-3 font-semibold text-sm">
-              <h3 className="font-black text-sm uppercase text-zinc-700 border-b pb-2 mb-2">🌍 Acumulado Histórico</h3>
-              <div className="flex justify-between text-zinc-600"><span>(+) Receita Acumulada</span><span>{formataMoeda(totalVendidoSempre)}</span></div>
-              <div className="flex justify-between text-orange-600 border-b pb-2"><span>(-) Custo Total (CMV)</span><span>({formataMoeda(custoMercadoriaTotal)})</span></div>
-              <div className="flex justify-between text-zinc-800 font-black bg-white p-2 rounded"><span>(=) LUCRO BRUTO ACUMULADO</span><span className="text-blue-700">{formataMoeda(totalVendidoSempre - custoMercadoriaTotal)}</span></div>
-              <div className="flex justify-between text-red-600 border-b pb-2 pt-1"><span>(-) Despesas Acumuladas</span><span>({formataMoeda(despesasOperacionaisTotal)})</span></div>
-              <div className="flex justify-between text-white font-black text-base bg-zinc-900 p-3 rounded-lg"><span>(=) RESULTADO LÍQUIDO HISTÓRICO</span><span className="text-green-400">{formataMoeda(totalVendidoSempre - custoMercadoriaTotal - despesasOperacionaisTotal)}</span></div>
+
+            <div className="border border-zinc-200 rounded-xl p-4 bg-zinc-50">
+              <h3 className="font-black text-sm uppercase text-zinc-700 border-b pb-2 tracking-wide mb-4">🌍 Performance Histórica Total</h3>
+              <div className="space-y-3 font-semibold text-sm">
+                <div className="flex justify-between text-zinc-600"><span>(+) Receita Bruta Acumulada</span><span className="font-black text-zinc-800">{formataMoeda(totalVendidoSempre)}</span></div>
+                <div className="flex justify-between text-orange-600 border-b pb-2"><span>(-) Custo de Aquisição Total (CMV)</span><span className="font-black">({formataMoeda(custoMercadoriaTotal)})</span></div>
+                <div className="flex justify-between text-zinc-800 font-black text-base bg-white p-2 rounded shadow-sm"><span>(=) LUCRO BRUTO ACUMULADO</span><span className="text-blue-700">{formataMoeda(totalVendidoSempre - custoMercadoriaTotal)}</span></div>
+                <div className="flex justify-between text-red-600 border-b pb-2 pt-2"><span>(-) Despesas Estruturais Acumuladas</span><span className="font-black">({formataMoeda(despesasOperacionaisTotal)})</span></div>
+                <div className="flex justify-between text-white font-black text-lg bg-zinc-900 p-3 rounded-lg shadow-md">
+                  <span>(=) RESULTADO LÍQUIDO HISTÓRICO</span>
+                  <span className={(totalVendidoSempre - custoMercadoriaTotal - despesasOperacionaisTotal) >= 0 ? "text-green-400" : "text-red-400"}>
+                    {formataMoeda(totalVendidoSempre - custoMercadoriaTotal - despesasOperacionaisTotal)}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ==================== ABA 3: PASSO 3: GIRO DE ESTOQUE ==================== */}
+      {/* ABA 3: PASSO 3: GIRO DE ESTOQUE */}
       {abaAtiva === 'giro' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300">
           <div className="mb-4">
-            <h2 className="text-xl font-black text-orange-600">📦 Análise de Velocidade e Giro de Estoque</h2>
-            <p className="text-zinc-500 text-sm mt-0.5">Cruzamento inteligente de saídas versus estoque físico para sugestão de compra automática.</p>
+            <h2 className="text-xl font-black text-orange-600">📦 Inteligência de Giro de Estoque e Compras</h2>
+            <p className="text-zinc-500 text-sm mt-0.5">O sistema calcula quais perfumes saem mais e sugere automaticamente ordens de reposição.</p>
           </div>
+
           <div className="overflow-x-auto rounded-lg border border-[#E0DDDD]">
             <table className="w-full text-left">
               <thead className="bg-orange-50 border-b border-orange-200">
                 <tr>
                   <th className="p-3 text-xs font-bold text-orange-900">Produto</th>
-                  <th className="p-3 text-xs font-bold text-orange-900 text-center">Unidades Saídas</th>
-                  <th className="p-3 text-xs font-bold text-orange-900 text-center">Estoque Físico</th>
-                  <th className="p-3 text-xs font-bold text-orange-900 text-center">Status Operacional</th>
+                  <th className="p-3 text-xs font-bold text-orange-900">Marca</th>
+                  <th className="p-3 text-xs font-bold text-orange-900 text-center">Saídas Recentes</th>
+                  <th className="p-3 text-xs font-bold text-orange-900 text-center">Físico Atual</th>
+                  <th className="p-3 text-xs font-bold text-orange-900 text-center">Status de Giro</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 font-semibold text-sm">
                 {listaProdutos.map((p: any) => {
-                  const saídas = vendasPorProduto[p.id] || 0;
-                  const est = Number(p.estoque || 0);
-                  let badge = "🟢 Confortável";
-                  let classe = "bg-green-100 text-green-800 border-green-300";
-                  if (est === 0) {
-                    badge = "🔴 REPOR URGENTE";
-                    classe = "bg-red-100 text-red-800 border-red-300 animate-pulse";
-                  } else if (est <= 5 && saídas > 5) {
-                    badge = "🔥 ALTO GIRO / ATENÇÃO";
-                    classe = "bg-orange-100 text-orange-800 border-orange-300";
+                  const qtdSaidas = vendasPorProduto[p.id] || 0;
+                  const estoqueAtual = Number(p.estoque || 0);
+
+                  let statusGiro = "🟢 Seguro / Confortável";
+                  let corGiro = "bg-green-100 text-green-800 border-green-300";
+
+                  if (estoqueAtual === 0) {
+                    statusGiro = "🔴 REPOR URGENTE";
+                    corGiro = "bg-red-100 text-red-800 border-red-300 animate-pulse";
+                  } else if (estoqueAtual <= 5 && qtdSaidas > 8) {
+                    statusGiro = "🔥 ALTO GIRO / CRÍTICO";
+                    corGiro = "bg-orange-100 text-orange-800 border-orange-300";
+                  } else if (estoqueAtual > 15 && qtdSaidas === 0) {
+                    statusGiro = "🟡 ESTOQUE PARADO / LENTO";
+                    corGiro = "bg-yellow-100 text-yellow-800 border-yellow-300";
                   }
+
                   return (
                     <tr key={p.id} className="hover:bg-zinc-50/50">
                       <td className="p-3 text-zinc-900 font-black">{p.nome}</td>
-                      <td className="p-3 text-center">{saídas} un.</td>
-                      <td className="p-3 text-center font-black">{est} un.</td>
-                      <td className="p-3 text-center"><span className={`px-2.5 py-1 rounded-full border text-[10px] font-black uppercase ${classe}`}>{badge}</span></td>
+                      <td className="p-3 text-xs uppercase text-zinc-400 font-bold">{p.marca || 'Nacional/Importado'}</td>
+                      <td className="p-3 text-center text-zinc-800">{qtdSaidas} un.</td>
+                      <td className={`p-3 text-center font-black ${estoqueAtual <= 3 ? 'text-red-600' : 'text-zinc-700'}`}>{estoqueAtual} un.</td>
+                      <td className="p-3 text-center">
+                        <span className={`px-3 py-1 rounded-full border text-[10px] font-black uppercase ${corGiro}`}>{statusGiro}</span>
+                      </td>
                     </tr>
                   );
                 })}
@@ -649,64 +650,30 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ==================== ABA 4: PASSO 4: ETIQUETAS ==================== */}
+      {/* ABA 4: PASSO 4: EMISSOR DE ETIQUETAS */}
       {abaAtiva === 'etiquetas' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300">
           <div className="mb-4">
-            <h2 className="text-xl font-black text-emerald-700">🏷️ Emissor de Etiquetas de Gôndola e Balcão</h2>
-            <p className="text-zinc-500 text-sm mt-0.5">Selecione o item para disparar a janela de impressão térmica do código de barras.</p>
+            <h2 className="text-xl font-black text-emerald-700">🏷️ Gerador Digital de Etiquetas para Balcão</h2>
+            <p className="text-zinc-500 text-sm mt-0.5">Selecione o perfume e dispare a impressão térmica estruturada para identificação rápida.</p>
           </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             {listaProdutos.map((p: any) => (
-              <div key={p.id} className="p-4 border border-zinc-200 rounded-xl bg-zinc-50 flex items-center justify-between gap-4">
+              <div key={p.id} className="p-4 border border-zinc-200 rounded-xl hover:border-emerald-500 transition-all bg-zinc-50 flex items-center justify-between gap-4">
                 <div className="truncate">
-                  <p className="font-black text-sm text-zinc-800 truncate">{p.nome}</p>
+                  <p className="font-black text-sm text-zinc-800 truncate" title={p.nome}>{p.nome}</p>
+                  <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mt-0.5">{p.marca || 'Fragrância'}</p>
                   <p className="text-xs font-black text-emerald-600 mt-1">{formataMoeda(p.precoVenda)}</p>
                 </div>
-                <button onClick={() => dispararImpressaoEtiqueta(p)} className="bg-emerald-600 text-white text-xs font-black px-4 py-2 rounded-lg hover:bg-emerald-700 active:scale-95 transition-all shadow-sm">🖨️ Gerar</button>
+                <button onClick={() => dispararImpressaoEtiqueta(p)} className="bg-emerald-600 text-white text-xs font-black px-4 py-2.5 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm uppercase whitespace-nowrap flex items-center gap-1.5 active:scale-95">
+                  <span>🖨️</span> Imprimir
+                </button>
               </div>
             ))}
           </div>
         </div>
       )}
-
-      {/* HISTÓRICO DE LOGS MANTIDO FIEL */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD]">
-        <div className="flex items-center justify-between border-b border-zinc-100 pb-4 mb-4">
-          <h2 className="text-xl font-black text-[#6A283A] flex items-center gap-2">
-            <span>📜</span> Histórico de Segurança (Logs)
-          </h2>
-          <span className="text-xs font-bold bg-zinc-100 text-zinc-600 px-3 py-1 rounded-md uppercase tracking-wider">Monitoramento em Tempo Real</span>
-        </div>
-
-        <div className="divide-y divide-zinc-100 max-h-[300px] overflow-y-auto pr-2 space-y-1">
-          {logs.map((log) => (
-            <div key={log.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm hover:bg-zinc-50/50 px-2 rounded-lg transition-colors">
-              <div className="flex items-start gap-3">
-                <span className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider mt-0.5 flex-shrink-0 ${
-                  log.categoria === 'venda' ? 'bg-green-100 text-green-800 border border-green-200' :
-                  log.categoria === 'caixa' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
-                  log.categoria === 'produto' ? 'bg-blue-100 text-blue-800 border border-blue-200' : 'bg-zinc-100 text-zinc-700 border border-zinc-200'
-                }`}>
-                  {log.categoria}
-                </span>
-                <div>
-                  <p className="text-zinc-700 font-semibold leading-relaxed">{log.descricao}</p>
-                  <p className="text-[10px] font-black text-zinc-400 uppercase tracking-wider mt-1">👤 Autor da ação: {log.usuarioNome}</p>
-                </div>
-              </div>
-              <span className="text-xs text-zinc-400 font-mono sm:text-right whitespace-nowrap">{new Date(log.data).toLocaleString('pt-BR')}</span>
-            </div>
-          ))}
-
-          {logs.length === 0 && (
-            <div className="p-8 text-center bg-zinc-50 rounded-lg border border-dashed border-zinc-200">
-              <div className="text-3xl opacity-40 mb-2">📭</div>
-              <p className="text-zinc-400 font-medium text-sm">Nenhuma atividade registrada no histórico de auditoria.</p>
-            </div>
-          )}
-        </div>
-      </div>
 
     </div>
   );
