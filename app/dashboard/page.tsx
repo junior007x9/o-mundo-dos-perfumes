@@ -45,14 +45,24 @@ export default function DashboardPage() {
     }
   };
 
-  // 🚀 ATUALIZADO: Extrai e exibe de forma amigável a observação interna salva na tabela administrativa
+  // 🚀 ATUALIZADO: Extrai também a observação da divisão Múltipla
   const formatarPagamentoTabela = (pag: string) => {
     if (!pag) return 'DINHEIRO';
     const pLow = pag.toLowerCase();
     if (pLow === 'credito') return 'CRÉDITO 💳';
     if (pLow === 'debito') return 'DÉBITO 💳';
-    if (pLow.startsWith('multiplo:')) return 'MÚLTIPLO 🔀';
     
+    // Tratamento para Venda Múltipla
+    if (pLow.startsWith('multiplo:')) {
+      if (pag.includes('obs=')) {
+        const match = pag.match(/obs=([^;]+)/);
+        const obsExtraida = match ? match[1] : '';
+        return obsExtraida ? `MÚLTIPLO 🔀 (${obsExtraida})` : 'MÚLTIPLO 🔀';
+      }
+      return 'MÚLTIPLO 🔀';
+    }
+    
+    // Tratamento para Venda Direta
     if (pLow.startsWith('venda_direta')) {
       if (pag.includes(':obs=')) {
         const obsExtraida = pag.split(':obs=')[1];
@@ -269,7 +279,6 @@ export default function DashboardPage() {
 
   const obterPagamento = (v: any) => (v.formaPagamento || '').toLowerCase();
 
-  // 🚀 CÁLCULO TRADICIONAL
   const hojePix = vendasHoje.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'pix', v.total), 0);
   const hojeCredito = vendasHoje.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'credito', v.total), 0);
   const hojeDebito = vendasHoje.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'debito', v.total), 0);
@@ -280,7 +289,6 @@ export default function DashboardPage() {
   const mesDebito = vendasMes.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'debito', v.total), 0);
   const mesDinheiro = vendasMes.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'dinheiro', v.total), 0);
 
-  // 🚀 LÓGICA DE SEPARAÇÃO DA VENDA DIRETA
   const hojeVendaDireta = vendasHoje.filter((v: any) => obterPagamento(v).startsWith('venda_direta')).reduce((acc: number, v: any) => acc + v.total, 0);
   const mesVendaDireta = vendasMes.filter((v: any) => obterPagamento(v).startsWith('venda_direta')).reduce((acc: number, v: any) => acc + v.total, 0);
   const totalVendaDiretaSempre = vendasValidas.filter((v: any) => obterPagamento(v).startsWith('venda_direta')).reduce((acc: number, v: any) => acc + v.total, 0);
@@ -292,6 +300,7 @@ export default function DashboardPage() {
       const partes = f.replace('multiplo:', '').split(';');
       for (const p of partes) {
         const [k, v] = p.split('=');
+        // A proteção com Number resolve a ignorar o obs na hora da soma financeira
         if (k === tipo || (tipo === 'credito' && k === 'cartao')) return Number(v) || 0;
       }
       return 0;
@@ -301,7 +310,6 @@ export default function DashboardPage() {
     return 0;
   }
 
-  // 🚀 LÓGICA AUTOMÁTICA DE CUSTO DA MERCADORIA (COM PROTEÇÃO TYPESCRIPT DA VERCEL)
   const idsVendasValidas = new Set(vendasValidas.map((v: any) => v.id));
   const idsVendasMes = new Set(vendasMes.map((v: any) => v.id));
   
@@ -322,7 +330,6 @@ export default function DashboardPage() {
       
       const custoUnitario = Number(custoProdutoMap.get(itemId) || 0);
       
-      // 🚀 Conversão estrita em número na hora de multiplicar para Vercel não travar
       custoMercadoriaTotal += (custoUnitario * itemQtd);
 
       if (idsVendasMes.has(item.idVenda)) {
@@ -356,7 +363,6 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         
-        {/* CARD DE HOJE C/ VENDA DIRETA */}
         <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-[#6A283A] flex flex-col justify-between">
           <div>
             <h3 className="text-xs md:text-sm font-bold text-zinc-500 uppercase tracking-wider">Vendas de Hoje</h3>
@@ -371,7 +377,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* CARD DO MÊS C/ VENDA DIRETA */}
         <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-[#A56877] flex flex-col justify-between">
           <div>
             <h3 className="text-xs md:text-sm font-bold text-zinc-500 uppercase tracking-wider">Faturamento do Mês</h3>
@@ -386,7 +391,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* CARD AUTOMATIZADO: Controle Acumulado da Venda Direta */}
         <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-purple-600 transition-transform hover:scale-105 flex flex-col justify-between">
           <div>
             <h3 className="text-xs md:text-sm font-bold text-zinc-500 uppercase tracking-wider">Total Venda Direta (Histórico)</h3>

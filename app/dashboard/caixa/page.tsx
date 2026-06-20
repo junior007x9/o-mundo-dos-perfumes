@@ -17,7 +17,6 @@ export default function CaixaPage() {
   const [clientesDB, setClientesDB] = useState<any[]>([]);
   const [clienteSelecionado, setClienteSelecionado] = useState<string>('');
   
-  // ESTADOS DO NOVO MODAL DE CLIENTE
   const [modalCliente, setModalCliente] = useState(false);
   const [nomeCli, setNomeCli] = useState('');
   const [telefoneCli, setTelefoneCli] = useState('');
@@ -37,8 +36,9 @@ export default function CaixaPage() {
   const [desconto, setDesconto] = useState<number | string>('');
   const [valoresMultiplos, setValoresMultiplos] = useState({ dinheiro: '', pix: '', credito: '', debito: '' });
   
-  // Estado para a observação oculta da Venda Direta
+  // 🚀 Estados para as observações ocultas
   const [observacaoDireta, setObservacaoDireta] = useState('');
+  const [observacaoMultipla, setObservacaoMultipla] = useState(''); // NOVO CAMPO
 
   const [modalFechamento, setModalFechamento] = useState(false);
   const [mostrarTutorial, setMostrarTutorial] = useState(true);
@@ -114,7 +114,6 @@ export default function CaixaPage() {
     if (pag === 'credito') return 'CARTÃO DE CRÉDITO';
     if (pag === 'debito') return 'CARTÃO DE DÉBITO';
     
-    // Trata a string da venda direta removendo a obs interna na exibição do cupom
     if (pag === 'venda_direta' || pag.startsWith('venda_direta:')) {
       return 'VENDA DIRETA (PARCELADO) 📝';
     }
@@ -124,7 +123,8 @@ export default function CaixaPage() {
       const listaFormatada: string[] = [];
       partes.forEach(p => {
         const [k, v] = p.split('=');
-        if (Number(v) > 0) {
+        // 🚀 Ignora o campo 'obs' para não aparecer no recibo do cliente
+        if (k !== 'obs' && Number(v) > 0) {
           const nome = k === 'dinheiro' ? 'Dinheiro' : k === 'pix' ? 'PIX' : k === 'credito' ? 'Crédito' : 'Débito';
           listaFormatada.push(`${nome}: R$ ${Number(v).toFixed(2)}`);
         }
@@ -191,7 +191,13 @@ export default function CaixaPage() {
 
   const processarBuscaProduto = (termoBusca: string) => {
     if (!termoBusca.trim()) return;
-    const prodEncontrado = produtos.find(p => p.codigoBarras === termoBusca || p.nome.toLowerCase().includes(termoBusca.toLowerCase()));
+    const termo = termoBusca.toLowerCase();
+    const prodEncontrado = produtos.find(p => 
+      p.codigoBarras === termoBusca || 
+      p.nome?.toLowerCase().includes(termo) ||
+      p.marca?.toLowerCase().includes(termo) ||
+      p.precoVenda?.toString().includes(termo)
+    );
     if (prodEncontrado) {
       adicionarAoCarrinho(prodEncontrado);
       setBuscaTexto('');
@@ -230,8 +236,9 @@ export default function CaixaPage() {
   const handleFinalizarVenda = async () => {
     if (carrinho.length === 0) return;
 
+    // 🚀 INCLUI A OBSERVAÇÃO MULTIPLA E DIRETA NA STRING DE ENVIO
     const formaEnvio = pagamento === 'multiplo'
-      ? `multiplo:dinheiro=${(Number(valoresMultiplos.dinheiro) || 0) - trocoMultiplo};pix=${Number(valoresMultiplos.pix) || 0};credito=${Number(valoresMultiplos.credito) || 0};debito=${Number(valoresMultiplos.debito) || 0}`
+      ? `multiplo:dinheiro=${(Number(valoresMultiplos.dinheiro) || 0) - trocoMultiplo};pix=${Number(valoresMultiplos.pix) || 0};credito=${Number(valoresMultiplos.credito) || 0};debito=${Number(valoresMultiplos.debito) || 0}${observacaoMultipla.trim() ? `;obs=${observacaoMultipla.replace(/[:;=]/g, ' ')}` : ''}`
       : pagamento === 'venda_direta' && observacaoDireta.trim()
         ? `venda_direta:obs=${observacaoDireta.replace(/[:;=]/g, ' ')}`
         : pagamento;
@@ -260,6 +267,7 @@ export default function CaixaPage() {
     setDesconto('');
     setValoresMultiplos({ dinheiro: '', pix: '', credito: '', debito: '' });
     setObservacaoDireta('');
+    setObservacaoMultipla(''); // Limpa a observação múltipla
     setPagamento('dinheiro');
     setClienteSelecionado(''); 
     setVendaSucesso(true);
@@ -337,7 +345,6 @@ export default function CaixaPage() {
     setModalFechamento(false);
   };
 
-  // 🚀 LÓGICA DE BUSCA UNIVERSAL APRIMORADA (Nome, Marca, Código e Preço)
   const produtosFiltrados = produtos.filter((p) => {
     if (!buscaTexto.trim()) return true;
     const termo = buscaTexto.toLowerCase();
@@ -392,13 +399,11 @@ export default function CaixaPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] lg:h-[calc(100vh-6rem)] gap-3 md:gap-4 overflow-hidden min-h-0">
       
-      {/* MODAL DE NOVO CLIENTE */}
       {modalCliente && (
         <div className="fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white p-6 md:p-8 rounded-2xl w-full max-w-sm shadow-2xl">
             <h3 className="font-black text-2xl text-[#6A283A] mb-2">Novo Cliente 👤</h3>
             <p className="text-zinc-500 text-sm mb-6">Cadastre rapidamente para vincular à venda.</p>
-            
             <form onSubmit={handleSalvarCliente} className="space-y-4">
               <div>
                 <label className="text-xs font-bold text-zinc-600 block mb-1">Nome Completo *</label>
@@ -412,21 +417,15 @@ export default function CaixaPage() {
                 <label className="text-xs font-bold text-zinc-600 block mb-1">Data de Nascimento</label>
                 <input type="text" value={dataNascCli} onChange={handleDataNascChange} className="w-full p-3 rounded-lg bg-zinc-50 border border-zinc-300 font-bold text-sm outline-none focus:ring-2 focus:ring-[#6A283A]" placeholder="DD/MM/AAAA" />
               </div>
-              
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setModalCliente(false)} className="flex-1 bg-zinc-200 text-zinc-800 font-bold py-3 rounded-xl hover:bg-zinc-300 transition-colors uppercase text-sm">
-                  Cancelar
-                </button>
-                <button type="submit" disabled={salvandoCli} className="flex-[2] bg-[#6A283A] text-white font-black py-3 rounded-xl hover:bg-[#521e2d] transition-colors uppercase shadow-md text-sm disabled:opacity-50">
-                  {salvandoCli ? 'Salvando...' : 'Salvar e Vincular'}
-                </button>
+                <button type="button" onClick={() => setModalCliente(false)} className="flex-1 bg-zinc-200 text-zinc-800 font-bold py-3 rounded-xl hover:bg-zinc-300 transition-colors uppercase text-sm">Cancelar</button>
+                <button type="submit" disabled={salvandoCli} className="flex-[2] bg-[#6A283A] text-white font-black py-3 rounded-xl hover:bg-[#521e2d] transition-colors uppercase shadow-md text-sm disabled:opacity-50">{salvandoCli ? 'Salvando...' : 'Salvar e Vincular'}</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Modal Fechamento */}
       {modalFechamento && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white p-6 md:p-8 rounded-2xl w-full max-w-sm shadow-2xl">
@@ -459,18 +458,13 @@ export default function CaixaPage() {
               </div>
             </div>
             <div className="flex gap-3">
-              <button onClick={() => setModalFechamento(false)} className="flex-1 bg-zinc-200 text-zinc-800 font-bold py-3 rounded-xl hover:bg-zinc-300 transition-colors uppercase text-sm">
-                Voltar
-              </button>
-              <button onClick={handleFecharCaixa} className="flex-[2] bg-red-600 text-white font-black py-3 rounded-xl hover:bg-red-700 transition-colors uppercase shadow-md text-sm">
-                Encerrar Caixa
-              </button>
+              <button onClick={() => setModalFechamento(false)} className="flex-1 bg-zinc-200 text-zinc-800 font-bold py-3 rounded-xl hover:bg-zinc-300 transition-colors uppercase text-sm">Voltar</button>
+              <button onClick={handleFecharCaixa} className="flex-[2] bg-red-600 text-white font-black py-3 rounded-xl hover:bg-red-700 transition-colors uppercase shadow-md text-sm">Encerrar Caixa</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Leitor de Câmera */}
       {cameraAberta && (
         <div className="fixed inset-0 bg-black/95 z-[9999] flex flex-col items-center justify-center p-4 backdrop-blur-md">
           <div className="w-full max-w-sm flex flex-col items-center gap-6">
@@ -481,7 +475,6 @@ export default function CaixaPage() {
         </div>
       )}
 
-      {/* Tutorial */}
       {mostrarTutorial && (
         <div className="flex-shrink-0 bg-gradient-to-r from-blue-50 to-white p-3 rounded-xl border border-blue-200 shadow-sm flex items-center gap-3 relative">
           <button onClick={() => setMostrarTutorial(false)} className="absolute top-2 right-2 text-blue-400 hover:text-red-500 font-bold text-xs">✖</button>
@@ -496,7 +489,6 @@ export default function CaixaPage() {
         </div>
       )}
 
-      {/* 🚀 BARRA DE BUSCA UNIVERSAL APRIMORADA */}
       <div className="flex-shrink-0 bg-white p-2 rounded-xl shadow-sm border border-[#E0DDDD] flex gap-2">
         <div className="relative flex-1">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">🔍</span>
@@ -514,7 +506,6 @@ export default function CaixaPage() {
 
       <div className="flex-1 flex flex-col lg:flex-row gap-3 min-h-0 overflow-hidden">
         
-        {/* Catálogo */}
         <div className="flex-1 bg-white flex flex-col rounded-xl shadow-sm border border-[#E0DDDD] min-h-0 overflow-hidden">
           <div className="flex-shrink-0 flex justify-between items-center p-3 border-b border-[#E0DDDD] bg-zinc-50">
             <h2 className="text-lg font-black text-[#6A283A]">Catálogo Rápido</h2>
@@ -526,7 +517,6 @@ export default function CaixaPage() {
                 <button key={p.id} onClick={() => adicionarAoCarrinho(p)} disabled={p.estoque <= 0} className={`p-3 border-2 rounded-xl text-left transition-all flex flex-col justify-between ${p.estoque > 0 ? 'border-[#E0DDDD] hover:border-[#6A283A] bg-white hover:bg-[#f9f1f0] active:scale-95 shadow-sm' : 'border-zinc-200 opacity-50 bg-zinc-100 cursor-not-allowed'}`}>
                   <div>
                     <h3 className="font-bold text-zinc-900 text-xs leading-tight line-clamp-2 h-8">{p.nome}</h3>
-                    {/* Exibe a Marca no card caso exista, para ajudar na identificação visual */}
                     {p.marca && <p className="text-[9px] font-black text-purple-600 uppercase mt-0.5 line-clamp-1">{p.marca}</p>}
                     <p className="text-[10px] font-semibold text-zinc-500 mt-1">Estoque: {p.estoque}</p>
                   </div>
@@ -543,7 +533,6 @@ export default function CaixaPage() {
           </div>
         </div>
 
-        {/* Carrinho e Checkout */}
         <div className="w-full lg:w-[380px] xl:w-[420px] flex-shrink-0 bg-zinc-50 flex flex-col rounded-xl shadow-lg border border-[#E0DDDD] min-h-0 overflow-hidden">
           
           <div className="flex-shrink-0 bg-[#6A283A] text-white p-3 flex justify-between items-center shadow-md">
@@ -573,18 +562,12 @@ export default function CaixaPage() {
             )}
           </div>
 
-          {/* CHECKOUT MASTER COMPACTO */}
           <div className="flex-shrink-0 bg-white border-t-2 border-zinc-200 p-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
             
             <div className="grid grid-cols-2 gap-2 mb-2">
               <div>
                 <label className="text-[10px] font-bold text-zinc-500 uppercase mb-0.5 block">🏷️ Desconto (R$)</label>
-                <input 
-                  type="number" step="0.01" value={desconto} 
-                  onChange={(e) => setDesconto(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))} 
-                  placeholder="0.00" 
-                  className="w-full p-2 rounded bg-zinc-50 font-bold border border-zinc-300 outline-none text-zinc-800 text-xs shadow-inner" 
-                />
+                <input type="number" step="0.01" value={desconto} onChange={(e) => setDesconto(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))} placeholder="0.00" className="w-full p-2 rounded bg-zinc-50 font-bold border border-zinc-300 outline-none text-zinc-800 text-xs shadow-inner" />
               </div>
               <div>
                 <div className="flex justify-between items-end mb-0.5">
@@ -593,9 +576,7 @@ export default function CaixaPage() {
                 </div>
                 <select value={clienteSelecionado} onChange={(e) => setClienteSelecionado(e.target.value)} className="w-full p-2 rounded bg-zinc-50 font-bold border border-zinc-300 outline-none text-zinc-800 text-xs">
                   <option value="">👤 Consumidor Final</option>
-                  {clientesDB.map(c => (
-                    <option key={c.id} value={c.id}>{c.nome.substring(0, 15)}</option>
-                  ))}
+                  {clientesDB.map(c => <option key={c.id} value={c.id}>{c.nome.substring(0, 15)}</option>)}
                 </select>
               </div>
             </div>
@@ -612,21 +593,13 @@ export default function CaixaPage() {
               </select>
             </div>
 
-            {/* Campo condicional de observação da Venda Direta */}
             {pagamento === 'venda_direta' && (
               <div className="mb-2 animate-in fade-in duration-200">
                 <label className="text-[10px] font-bold text-purple-700 uppercase mb-0.5 block">📝 Nota Interna / Parcelas (Fica oculto no cupom)</label>
-                <input 
-                  type="text" 
-                  value={observacaoDireta} 
-                  onChange={(e) => setObservacaoDireta(e.target.value)}
-                  placeholder="Ex: Combinado 3x de R$ 50 no dia 10" 
-                  className="w-full p-2 rounded bg-purple-50/50 text-purple-900 border-2 border-purple-200 font-bold text-xs outline-none focus:border-purple-500" 
-                />
+                <input type="text" value={observacaoDireta} onChange={(e) => setObservacaoDireta(e.target.value)} placeholder="Ex: Combinado 3x de R$ 50 no dia 10" className="w-full p-2 rounded bg-purple-50/50 text-purple-900 border-2 border-purple-200 font-bold text-xs outline-none focus:border-purple-500" />
               </div>
             )}
 
-            {/* DINHEIRO TRADICIONAL */}
             {pagamento === 'dinheiro' && (
               <div className="grid grid-cols-2 gap-2 mb-2 animate-in fade-in duration-200 items-end">
                 <div>
@@ -642,25 +615,31 @@ export default function CaixaPage() {
               </div>
             )}
 
-            {/* SUB-PAINEL DE MÚLTIPLAS COMBINAÇÕES */}
             {pagamento === 'multiplo' && (
               <div className="bg-zinc-50 p-2 rounded-lg border border-zinc-200 mb-2 grid grid-cols-2 gap-2 animate-in slide-in-from-top-1 duration-200">
                 <div>
                   <label className="text-[9px] font-black text-zinc-600 block">💵 Dinheiro (R$)</label>
-                  <input type="number" step="0.01" value={valoresMultiplos.dinheiro} onChange={(e) => setValoresMultiplos({...valoresMultiplos, dinheiro: e.target.value})} className="w-full p-1 rounded border border-zinc-300 font-bold text-xs" placeholder="0.00" />
+                  <input type="number" step="0.01" value={valoresMultiplos.dinheiro} onChange={(e) => setValoresMultiplos({...valoresMultiplos, dinheiro: e.target.value})} className="w-full p-1.5 rounded border border-zinc-300 font-bold text-xs" placeholder="0.00" />
                 </div>
                 <div>
                   <label className="text-[9px] font-black text-zinc-600 block">💠 PIX (R$)</label>
-                  <input type="number" step="0.01" value={valoresMultiplos.pix} onChange={(e) => setValoresMultiplos({...valoresMultiplos, pix: e.target.value})} className="w-full p-1 rounded border border-zinc-300 font-bold text-xs" placeholder="0.00" />
+                  <input type="number" step="0.01" value={valoresMultiplos.pix} onChange={(e) => setValoresMultiplos({...valoresMultiplos, pix: e.target.value})} className="w-full p-1.5 rounded border border-zinc-300 font-bold text-xs" placeholder="0.00" />
                 </div>
                 <div>
                   <label className="text-[9px] font-black text-zinc-600 block">💳 Crédito (R$)</label>
-                  <input type="number" step="0.01" value={valoresMultiplos.credito} onChange={(e) => setValoresMultiplos({...valoresMultiplos, credito: e.target.value})} className="w-full p-1 rounded border border-zinc-300 font-bold text-xs" placeholder="0.00" />
+                  <input type="number" step="0.01" value={valoresMultiplos.credito} onChange={(e) => setValoresMultiplos({...valoresMultiplos, credito: e.target.value})} className="w-full p-1.5 rounded border border-zinc-300 font-bold text-xs" placeholder="0.00" />
                 </div>
                 <div>
                   <label className="text-[9px] font-black text-zinc-600 block">💳 Débito (R$)</label>
-                  <input type="number" step="0.01" value={valoresMultiplos.debito} onChange={(e) => setValoresMultiplos({...valoresMultiplos, debito: e.target.value})} className="w-full p-1 rounded border border-zinc-300 font-bold text-xs" placeholder="0.00" />
+                  <input type="number" step="0.01" value={valoresMultiplos.debito} onChange={(e) => setValoresMultiplos({...valoresMultiplos, debito: e.target.value})} className="w-full p-1.5 rounded border border-zinc-300 font-bold text-xs" placeholder="0.00" />
                 </div>
+                
+                {/* 🚀 NOVO: CAMPO DE OBSERVAÇÃO PARA MÚLTIPLAS FORMAS */}
+                <div className="col-span-2">
+                  <label className="text-[9px] font-black text-zinc-600 block">📝 Observação da Divisão (Oculto no cupom)</label>
+                  <input type="text" value={observacaoMultipla} onChange={(e) => setObservacaoMultipla(e.target.value)} className="w-full p-1.5 rounded border border-zinc-300 font-bold text-xs bg-white focus:border-[#6A283A] outline-none" placeholder="Ex: Cartão da mãe, PIX da tia..." />
+                </div>
+
                 <div className="col-span-2 pt-1 border-t border-zinc-200 flex justify-between items-center text-[10px]">
                   <span className="font-bold text-zinc-500">
                     Falta: <strong className={faltaPagarMultiplo > 0 ? "text-red-600" : "text-green-600"}>{formataMoeda(Math.max(0, faltaPagarMultiplo))}</strong>
@@ -672,7 +651,6 @@ export default function CaixaPage() {
               </div>
             )}
 
-            {/* TOTAIS E BOTÃO */}
             <div className="flex items-stretch gap-2 mt-1">
               <div className="flex-[1.4] bg-zinc-100 border border-zinc-200 rounded-lg p-1.5 flex flex-col justify-center items-center">
                 <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mb-0.5">A Pagar</span>
