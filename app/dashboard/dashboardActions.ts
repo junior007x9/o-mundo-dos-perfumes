@@ -16,7 +16,6 @@ export async function getDadosDashboard() {
   const listaClientes = await db.select().from(clientes);
   const listaItens = await db.select().from(itensVenda);
 
-  // 🚀 SEGURANÇA: Só busca os logs confidenciais se for o administrador
   let logs: any[] = [];
   if (isAdmin) {
     logs = await db.select().from(logsSistema).orderBy(desc(logsSistema.id)).limit(30);
@@ -30,21 +29,17 @@ export async function getDadosDashboard() {
     listaClientes, 
     listaItens,
     logs,
-    // Mantemos essas duas chaves para garantir compatibilidade com o restante do seu sistema
     idVendedorLogado: usuario?.id || 0,
     cargoVendedor: usuario?.cargo || 'vendedor'
   };
 }
 
 export async function cancelarVendaAction(idVenda: number) {
-  // 🚀 DESCOBRE QUEM ESTÁ CANCELANDO A VENDA
   const usu = await getUsuarioLogado();
   const nomeUsuario = usu?.nome || 'Sistema';
 
-  // Encontra os itens da venda
   const itens = await db.select().from(itensVenda).where(eq(itensVenda.idVenda, idVenda));
 
-  // Devolve as quantidades ao estoque
   for (const item of itens) {
     const resProduto = await db.select().from(produtos).where(eq(produtos.id, item.idProduto)).limit(1);
     const produtoAtual = resProduto[0];
@@ -56,18 +51,65 @@ export async function cancelarVendaAction(idVenda: number) {
     }
   }
 
-  // Marca a venda como cancelada
   await db.update(vendas).set({ status: 'cancelada' }).where(eq(vendas.id, idVenda));
 
-  // 🚀 LOG AUTOMÁTICO: Registra o estorno no histórico de auditoria e QUEM fez a ação
   await db.insert(logsSistema).values({
     descricao: `🔄 Venda #${idVenda} estornada com sucesso. Os produtos retornaram ao estoque.`,
     data: new Date().toISOString(),
     categoria: 'venda',
-    usuarioNome: nomeUsuario // <--- AQUI ESTÁ A CORREÇÃO MÁGICA
+    usuarioNome: nomeUsuario 
   });
 
   revalidatePath('/dashboard');
-  revalidatePath('/dashboard/caixa');
-  revalidatePath('/dashboard/produtos');
+}
+
+// 🚀 PASSO 1: FUNÇÃO PARA QUITAR TOTALMENTE A DÍVIDA
+export async function quitarVendaAction(idVenda: number) {
+  const usu = await getUsuarioLogado();
+  const nomeUsuario = usu?.nome || 'Sistema';
+
+  const resVenda = await db.select().from(vendas).where(eq(vendas.id, idVenda)).limit(1);
+  const vendaAtual = resVenda[0];
+
+  if (vendaAtual) {
+    // Insere a tag seguro de liquidação
+    const novaFormaPagamento = `${vendaAtual.formaPagamento};pago=true`;
+    await db.update(vendas).set({ formaPagamento: novaFormaPagamento }).where(eq(vendas.id, idVenda));
+
+    await db.insert(logsSistema).values({
+      descricao: `✅ Conta vinculada à Venda #${idVenda} foi totalmente quitada e baixada.`,
+      data: new Date().toISOString(),
+      categoria: 'venda',
+      usuarioNome: nomeUsuario
+    });
+  }
+
+  revalidatePath('/dashboard');
+}
+
+// 🚀 PASSO 1: FUNÇÃO PARA ATUALIZAR A NOTA DE CONFERÊNCIA (BAIXA PARCIAL)
+export async function atualizarNotaReceberAction(idVenda: number, novaNota: string) {
+  const usu = await getUsuarioLogado();
+  const nomeUsuario = usu?.nome || 'Sistema';
+
+  const resVenda = await db.select().from(vendas).where(eq(vendas.id, idVenda)).limit(1);
+  const vendaAtual = resVenda[0];
+
+  if (vendaAtual) {
+    // Remove qualquer anotação antiga para evitar duplicação e anexa a nova
+    const formaLimpa = vendaAtual.formaPagamento.split(';obs=')[0].split(':obs=')[0];
+    const prefixo = vendaAtual.formaPagamento.startsWith('venda_direta') ? 'venda_direta:obs=' : `${formaLimpa};obs=`;
+    const novaForma = `${prefixo}${novaNota.replace(/[:;=]/g, ' ')}`;
+
+    await db.update(vendas).set({ formaPagamento: novaForma }).where(eq(vendas.id, idVenda));
+
+    await db.insert(logsSistema).values({
+      descricao: `📝 Histórico de parcelas da Venda #${idVenda} modificado para: "${novaNota}".`,
+      data: new Date().toISOString(),
+      categoria: 'venda',
+      usuarioNome: nomeUsuario
+    });
+  }
+
+  revalidatePath('/dashboard');
 }
