@@ -18,6 +18,9 @@ export default function DashboardPage() {
   // 🚀 Controle unificado de todas as abas estratégicas
   const [abaAtiva, setAbaAtiva] = useState('geral');
 
+  // 🚀 MODO PRIVACIDADE (Ocultar dados sensíveis)
+  const [ocultarValores, setOcultarValores] = useState(false);
+
   // Estados para as Comissões
   const [metaLoja, setMetaLoja] = useState<number>(50000); 
   const [taxaComissao, setTaxaComissao] = useState<number>(5);
@@ -44,7 +47,6 @@ export default function DashboardPage() {
     setCarregando(false);
   }
 
-  // 🚀 AQUI ESTÁ A FUNÇÃO DE ESTORNO QUE AGORA TEM O BOTÃO NA TELA NOVAMENTE
   const handleEstornarVenda = async (idVenda: number) => {
     if(confirm('ATENÇÃO: Deseja realmente cancelar esta venda?\n\nO valor será subtraído do faturamento e os produtos voltarão automaticamente para o estoque.')) {
       await cancelarVendaAction(idVenda);
@@ -128,6 +130,9 @@ export default function DashboardPage() {
   };
 
   const formataMoeda = (valor: number) => valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  
+  // 🚀 FUNÇÃO DE MASCARAMENTO SE O MODO PRIVACIDADE ESTIVER ATIVO
+  const exibirMoeda = (valor: number) => ocultarValores ? 'R$ •••••' : formataMoeda(valor);
 
   const exportarParaExcel = () => {
     if (!dados || !dados.listaVendas || dados.listaVendas.length === 0) return;
@@ -341,6 +346,13 @@ export default function DashboardPage() {
             <p className="text-zinc-600 text-sm mt-0.5 font-medium">Controle de carteira (CRM), P&L, comissões, fluxo de mercadoria e rotulagem em um só lugar.</p>
           </div>
         </div>
+        {/* 🚀 BOTÃO DE MODO PRIVACIDADE */}
+        <button 
+          onClick={() => setOcultarValores(!ocultarValores)}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-black transition-all shadow-sm ${ocultarValores ? 'bg-zinc-800 text-white' : 'bg-white border border-[#E0DDDD] text-zinc-600 hover:bg-zinc-50'}`}
+        >
+          {ocultarValores ? '👁️ Mostrar Valores' : '🙈 Ocultar Valores'}
+        </button>
       </div>
 
       {/* MENU DE ABAS */}
@@ -360,24 +372,24 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-6">
             
             <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-[#6A283A] flex flex-col justify-between">
-              <div><h3 className="text-xs font-bold text-zinc-500 uppercase">Vendas de Hoje</h3><p className="text-2xl font-black text-[#6A283A] mt-2">{formataMoeda(totalVendidoHoje)}</p></div>
+              <div><h3 className="text-xs font-bold text-zinc-500 uppercase">Vendas de Hoje</h3><p className="text-2xl font-black text-[#6A283A] mt-2">{exibirMoeda(totalVendidoHoje)}</p></div>
               <div className="mt-4 pt-3 border-t border-zinc-100 grid grid-cols-2 gap-2 text-[10px] font-bold text-zinc-500 text-center">
-                <div className="bg-zinc-50 p-1.5 rounded">💵 {formataMoeda(hojeDinheiro)}</div>
-                <div className="bg-zinc-50 p-1.5 rounded">💠 {formataMoeda(hojePix)}</div>
-                <div className="bg-blue-50 text-blue-700 p-1.5 rounded">💳 CR: {formataMoeda(hojeCredito)}</div>
-                <div className="bg-teal-50 text-teal-700 p-1.5 rounded">💳 DB: {formataMoeda(hojeDebito)}</div>
-                <div className="bg-purple-50 text-purple-700 p-1.5 rounded col-span-2">📝 DIRETA: {formataMoeda(hojeVendaDireta)}</div>
+                <div className="bg-zinc-50 p-1.5 rounded">💵 {exibirMoeda(hojeDinheiro)}</div>
+                <div className="bg-zinc-50 p-1.5 rounded">💠 {exibirMoeda(hojePix)}</div>
+                <div className="bg-blue-50 text-blue-700 p-1.5 rounded">💳 CR: {exibirMoeda(hojeCredito)}</div>
+                <div className="bg-teal-50 text-teal-700 p-1.5 rounded">💳 DB: {exibirMoeda(hojeDebito)}</div>
+                <div className="bg-purple-50 text-purple-700 p-1.5 rounded col-span-2">📝 DIRETA: {exibirMoeda(hojeVendaDireta)}</div>
               </div>
             </div>
 
             <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-[#A56877] flex flex-col justify-between">
-              <div><h3 className="text-xs font-bold text-zinc-500 uppercase">Faturamento Mês</h3><p className="text-2xl font-black text-[#A56877] mt-2">{formataMoeda(totalVendidoMes)}</p></div>
+              <div><h3 className="text-xs font-bold text-zinc-500 uppercase">Faturamento Mês</h3><p className="text-2xl font-black text-[#A56877] mt-2">{exibirMoeda(totalVendidoMes)}</p></div>
               <div className="mt-4 pt-3 border-t border-zinc-100 grid grid-cols-2 gap-2 text-[10px] font-bold text-zinc-500 text-center">
-                <div className="bg-zinc-50 p-1.5 rounded">💵 {formataMoeda(mesDinheiro)}</div>
-                <div className="bg-zinc-50 p-1.5 rounded">💠 {formataMoeda(mesPix)}</div>
-                <div className="bg-blue-50 text-blue-700 p-1.5 rounded">💳 CR: {formataMoeda(mesCredito)}</div>
-                <div className="bg-teal-50 text-teal-700 p-1.5 rounded">💳 DB: {formataMoeda(mesDebito)}</div>
-                <div className="bg-purple-50 text-purple-700 p-1.5 rounded col-span-2">📝 DIRETA: {formataMoeda(mesVendaDireta)}</div>
+                <div className="bg-zinc-50 p-1.5 rounded">💵 {exibirMoeda(mesDinheiro)}</div>
+                <div className="bg-zinc-50 p-1.5 rounded">💠 {exibirMoeda(mesPix)}</div>
+                <div className="bg-blue-50 text-blue-700 p-1.5 rounded">💳 CR: {exibirMoeda(mesCredito)}</div>
+                <div className="bg-teal-50 text-teal-700 p-1.5 rounded">💳 DB: {exibirMoeda(mesDebito)}</div>
+                <div className="bg-purple-50 text-purple-700 p-1.5 rounded col-span-2">📝 DIRETA: {exibirMoeda(mesVendaDireta)}</div>
               </div>
             </div>
 
@@ -386,12 +398,12 @@ export default function DashboardPage() {
                 <h3 className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-1 cursor-help" title="Vendas pendentes e acordos fechados fora da modalidade de balcão à vista.">
                   Total Venda Direta ℹ️
                 </h3>
-                <p className="text-2xl font-black text-purple-600 mt-2">{formataMoeda(totalVendaDiretaSempre)}</p>
+                <p className="text-2xl font-black text-purple-600 mt-2">{exibirMoeda(totalVendaDiretaSempre)}</p>
                 <p className="text-[9px] text-zinc-400 mt-1 leading-tight border-b border-zinc-100 pb-2">Vendas externas/parceladas pendentes de controle (Contas a Receber).</p>
               </div>
               <div className="mt-2 text-xs text-zinc-500 font-bold flex justify-between">
                 <span>Balcão Loja:</span>
-                <span className="text-zinc-800">{formataMoeda(totalVendidoSempre - totalVendaDiretaSempre)}</span>
+                <span className="text-zinc-800">{exibirMoeda(totalVendidoSempre - totalVendaDiretaSempre)}</span>
               </div>
             </div>
 
@@ -400,19 +412,19 @@ export default function DashboardPage() {
                 <h3 className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-1 cursor-help" title="Custo das Mercadorias Vendidas. Valor de compra de todos os produtos que já foram vendidos.">
                   Custos (CMV) Mês ℹ️
                 </h3>
-                <p className="text-2xl font-black text-orange-600 mt-2">{formataMoeda(custoMercadoriaMes)}</p>
+                <p className="text-2xl font-black text-orange-600 mt-2">{exibirMoeda(custoMercadoriaMes)}</p>
                 <p className="text-[9px] text-zinc-400 mt-1 leading-tight">Valor bruto de custo investido apenas nas mercadorias que já saíram do estoque.</p>
               </div>
-              <p className="text-xs text-zinc-400 mt-4 pt-2 border-t border-zinc-100">Custo Histórico Total: <strong>{formataMoeda(custoMercadoriaTotal)}</strong></p>
+              <p className="text-xs text-zinc-400 mt-4 pt-2 border-t border-zinc-100">Custo Histórico Total: <strong>{exibirMoeda(custoMercadoriaTotal)}</strong></p>
             </div>
 
             <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-emerald-500 flex flex-col justify-between">
               <div>
                 <h3 className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-1">💰 Meta em Estoque</h3>
-                <p className="text-2xl font-black text-emerald-600 mt-2">{formataMoeda(valorPotencialAlcancado)}</p>
+                <p className="text-2xl font-black text-emerald-600 mt-2">{exibirMoeda(valorPotencialAlcancado)}</p>
                 <p className="text-[10px] text-zinc-400 mt-1">Valor financeiro total de venda a realizar no estoque físico atual.</p>
               </div>
-              <p className="text-xs text-zinc-400 mt-4 pt-2 border-t border-zinc-100">Capital Investido Atual: <strong>{formataMoeda(capitalInvestidoEstoque)}</strong></p>
+              <p className="text-xs text-zinc-400 mt-4 pt-2 border-t border-zinc-100">Capital Investido Atual: <strong>{exibirMoeda(capitalInvestidoEstoque)}</strong></p>
             </div>
 
           </div>
@@ -433,7 +445,6 @@ export default function DashboardPage() {
                     <th className="p-3 text-xs font-bold text-zinc-600 bg-zinc-50">Valor</th>
                     <th className="p-3 text-xs font-bold text-zinc-600 bg-zinc-50">Pagamento</th>
                     <th className="p-3 text-xs font-bold text-zinc-600 bg-zinc-50">Status</th>
-                    {/* 🚀 Restaurei a coluna AÇÃO no cabeçalho */}
                     <th className="p-3 text-xs font-bold text-zinc-600 text-right bg-zinc-50">Ação</th>
                   </tr>
                 </thead>
@@ -441,10 +452,9 @@ export default function DashboardPage() {
                   {listaVendas.map((venda: any) => (
                     <tr key={venda.id} className={`border-b border-[#E0DDDD]/50 ${venda.status === 'cancelada' ? 'bg-red-50/50' : ''}`}>
                       <td className="p-3 text-sm text-zinc-600">{new Date(venda.data).toLocaleString('pt-BR')}</td>
-                      <td className={`p-3 text-sm font-black ${venda.status === 'cancelada' ? 'text-zinc-400 line-through' : 'text-green-600'}`}>{formataMoeda(venda.total)}</td>
+                      <td className={`p-3 text-sm font-black ${venda.status === 'cancelada' ? 'text-zinc-400 line-through' : 'text-green-600'}`}>{exibirMoeda(venda.total)}</td>
                       <td className="p-3 text-xs font-bold text-zinc-500 uppercase">{formatarPagamentoTabela(venda.formaPagamento)}</td>
                       <td className="p-3"><span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${venda.status === 'cancelada' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{venda.status === 'cancelada' ? 'Cancelada' : 'Concluída'}</span></td>
-                      {/* 🚀 Restaurei a célula do botão de ESTORNAR */}
                       <td className="p-3 text-right">
                         {venda.status !== 'cancelada' && (
                           <button onClick={() => handleEstornarVenda(venda.id)} className="text-xs bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded hover:bg-red-600 hover:text-white transition-colors font-bold shadow-sm">
@@ -485,7 +495,7 @@ export default function DashboardPage() {
                       <td className="p-3 text-zinc-500">{new Date(venda.data).toLocaleDateString('pt-BR')}</td>
                       <td className="p-3 text-zinc-800 font-black">{nome}</td>
                       <td className={`p-3 font-medium ${quitada ? 'text-zinc-500 line-through' : 'text-purple-700 bg-purple-50/40'}`}>{limpa}</td>
-                      <td className={`p-3 font-black ${quitada ? 'text-zinc-400 line-through' : 'text-purple-600'}`}>{formataMoeda(venda.total)}</td>
+                      <td className={`p-3 font-black ${quitada ? 'text-zinc-400 line-through' : 'text-purple-600'}`}>{exibirMoeda(venda.total)}</td>
                       <td className="p-3 text-center">
                         {quitada ? <span className="bg-green-100 text-green-700 px-3 py-1 rounded text-[10px] font-black uppercase">✅ Quitado</span> : (
                           <div className="flex justify-center gap-2">
@@ -524,7 +534,7 @@ export default function DashboardPage() {
                   <tr key={cliente.id} className="hover:bg-pink-50/20">
                     <td className="p-3 flex items-center gap-3"><span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${index < 3 ? 'bg-amber-400 text-amber-900' : 'bg-zinc-100 text-zinc-500'}`}>{index + 1}º</span><div><p className="text-zinc-900 font-black">{cliente.nome}</p><p className="text-[10px] font-bold text-zinc-400">{cliente.telefone || 'Sem WhatsApp'}</p></div></td>
                     <td className="p-3 text-center text-zinc-600">{cliente.qtdCompras}x</td>
-                    <td className="p-3 font-black text-pink-600">{formataMoeda(cliente.totalGasto)}</td>
+                    <td className="p-3 font-black text-pink-600">{exibirMoeda(cliente.totalGasto)}</td>
                     <td className="p-3">
                       {cliente.dataUltimaCompra ? (
                         <div><p className="text-zinc-800">{new Date(cliente.dataUltimaCompra).toLocaleDateString('pt-BR')}</p><p className={`text-[10px] font-bold ${cliente.diasSemComprar > 60 ? 'text-red-500' : 'text-green-500'}`}>{cliente.diasSemComprar === 0 ? 'Comprou Hoje' : `Há ${cliente.diasSemComprar} dias`}</p></div>
@@ -551,21 +561,21 @@ export default function DashboardPage() {
             <div className="border border-zinc-200 rounded-xl p-4 bg-zinc-50">
               <h3 className="font-black text-sm uppercase text-zinc-700 border-b pb-2 mb-4">📅 Mês Atual</h3>
               <div className="space-y-3 font-semibold text-sm">
-                <div className="flex justify-between text-zinc-600"><span>(+) Receita Bruta</span><span className="font-black text-zinc-800">{formataMoeda(totalVendidoMes)}</span></div>
-                <div className="flex justify-between text-orange-600 border-b pb-2"><span>(-) Custo Mercadoria (CMV)</span><span className="font-black">({formataMoeda(custoMercadoriaMes)})</span></div>
-                <div className="flex justify-between text-zinc-800 font-black text-base bg-white p-2 rounded"><span>(=) LUCRO BRUTO</span><span className="text-blue-700">{formataMoeda(totalVendidoMes - custoMercadoriaMes)}</span></div>
-                <div className="flex justify-between text-red-600 border-b pb-2 pt-2"><span>(-) Despesas Estruturais</span><span className="font-black">({formataMoeda(despesasOperacionaisMes)})</span></div>
-                <div className="flex justify-between text-white font-black text-lg bg-zinc-800 p-3 rounded-lg shadow-md"><span>(=) LUCRO LÍQUIDO</span><span className={(totalVendidoMes - custoMercadoriaMes - despesasOperacionaisMes) >= 0 ? "text-green-400" : "text-red-400"}>{formataMoeda(totalVendidoMes - custoMercadoriaMes - despesasOperacionaisMes)}</span></div>
+                <div className="flex justify-between text-zinc-600"><span>(+) Receita Bruta</span><span className="font-black text-zinc-800">{exibirMoeda(totalVendidoMes)}</span></div>
+                <div className="flex justify-between text-orange-600 border-b pb-2"><span>(-) Custo Mercadoria (CMV)</span><span className="font-black">({exibirMoeda(custoMercadoriaMes)})</span></div>
+                <div className="flex justify-between text-zinc-800 font-black text-base bg-white p-2 rounded"><span>(=) LUCRO BRUTO</span><span className="text-blue-700">{exibirMoeda(totalVendidoMes - custoMercadoriaMes)}</span></div>
+                <div className="flex justify-between text-red-600 border-b pb-2 pt-2"><span>(-) Despesas Estruturais</span><span className="font-black">({exibirMoeda(despesasOperacionaisMes)})</span></div>
+                <div className="flex justify-between text-white font-black text-lg bg-zinc-800 p-3 rounded-lg shadow-md"><span>(=) LUCRO LÍQUIDO</span><span className={(totalVendidoMes - custoMercadoriaMes - despesasOperacionaisMes) >= 0 ? "text-green-400" : "text-red-400"}>{exibirMoeda(totalVendidoMes - custoMercadoriaMes - despesasOperacionaisMes)}</span></div>
               </div>
             </div>
             <div className="border border-zinc-200 rounded-xl p-4 bg-zinc-50">
               <h3 className="font-black text-sm uppercase text-zinc-700 border-b pb-2 mb-4">🌍 Histórico Total</h3>
               <div className="space-y-3 font-semibold text-sm">
-                <div className="flex justify-between text-zinc-600"><span>(+) Receita Acumulada</span><span className="font-black text-zinc-800">{formataMoeda(totalVendidoSempre)}</span></div>
-                <div className="flex justify-between text-orange-600 border-b pb-2"><span>(-) Custo Total (CMV)</span><span className="font-black">({formataMoeda(custoMercadoriaTotal)})</span></div>
-                <div className="flex justify-between text-zinc-800 font-black text-base bg-white p-2 rounded"><span>(=) LUCRO BRUTO</span><span className="text-blue-700">{formataMoeda(totalVendidoSempre - custoMercadoriaTotal)}</span></div>
-                <div className="flex justify-between text-red-600 border-b pb-2 pt-2"><span>(-) Despesas Acumuladas</span><span className="font-black">({formataMoeda(despesasOperacionaisTotal)})</span></div>
-                <div className="flex justify-between text-white font-black text-lg bg-zinc-900 p-3 rounded-lg shadow-md"><span>(=) RESULTADO FINAL</span><span className={(totalVendidoSempre - custoMercadoriaTotal - despesasOperacionaisTotal) >= 0 ? "text-green-400" : "text-red-400"}>{formataMoeda(totalVendidoSempre - custoMercadoriaTotal - despesasOperacionaisTotal)}</span></div>
+                <div className="flex justify-between text-zinc-600"><span>(+) Receita Acumulada</span><span className="font-black text-zinc-800">{exibirMoeda(totalVendidoSempre)}</span></div>
+                <div className="flex justify-between text-orange-600 border-b pb-2"><span>(-) Custo Total (CMV)</span><span className="font-black">({exibirMoeda(custoMercadoriaTotal)})</span></div>
+                <div className="flex justify-between text-zinc-800 font-black text-base bg-white p-2 rounded"><span>(=) LUCRO BRUTO</span><span className="text-blue-700">{exibirMoeda(totalVendidoSempre - custoMercadoriaTotal)}</span></div>
+                <div className="flex justify-between text-red-600 border-b pb-2 pt-2"><span>(-) Despesas Acumuladas</span><span className="font-black">({exibirMoeda(despesasOperacionaisTotal)})</span></div>
+                <div className="flex justify-between text-white font-black text-lg bg-zinc-900 p-3 rounded-lg shadow-md"><span>(=) RESULTADO FINAL</span><span className={(totalVendidoSempre - custoMercadoriaTotal - despesasOperacionaisTotal) >= 0 ? "text-green-400" : "text-red-400"}>{exibirMoeda(totalVendidoSempre - custoMercadoriaTotal - despesasOperacionaisTotal)}</span></div>
               </div>
             </div>
           </div>
@@ -621,8 +631,8 @@ export default function DashboardPage() {
               <div key={idVendedor} className="border border-amber-200 bg-amber-50/30 rounded-xl p-5 hover:shadow-md relative overflow-hidden">
                 <div className="absolute top-0 right-0 bg-amber-200 text-amber-800 text-[10px] font-black px-3 py-1 rounded-bl-lg uppercase">ID: {idVendedor}</div>
                 <h3 className="font-black text-zinc-800 text-lg mb-4 mt-2">{idVendedor === 'Loja Principal' ? 'Sede / Balcão Fixo' : `Vendedor #${idVendedor}`}</h3>
-                <div className="flex justify-between items-center text-sm mb-2"><span className="text-zinc-500 font-bold">Vendido:</span><span className="font-black text-zinc-800">{formataMoeda(Number(total))}</span></div>
-                <div className="flex justify-between items-center text-sm border-t border-amber-200 pt-2"><span className="text-amber-700 font-black uppercase">Comissão:</span><span className="font-black text-amber-600 text-xl">{formataMoeda(Number(total) * (taxaComissao / 100))}</span></div>
+                <div className="flex justify-between items-center text-sm mb-2"><span className="text-zinc-500 font-bold">Vendido:</span><span className="font-black text-zinc-800">{exibirMoeda(Number(total))}</span></div>
+                <div className="flex justify-between items-center text-sm border-t border-amber-200 pt-2"><span className="text-amber-700 font-black uppercase">Comissão:</span><span className="font-black text-amber-600 text-xl">{exibirMoeda(Number(total) * (taxaComissao / 100))}</span></div>
               </div>
             ))}
           </div>
@@ -640,6 +650,7 @@ export default function DashboardPage() {
               <div key={p.id} className="p-4 border border-zinc-200 rounded-xl hover:border-emerald-500 transition-all bg-zinc-50 flex items-center justify-between gap-4">
                 <div className="truncate">
                   <p className="font-black text-sm text-zinc-800 truncate" title={p.nome}>{String(p.nome)}</p>
+                  {/* Etiqueta na tela NUNCA Oculta (apenas para ver o preço real a imprimir) */}
                   <p className="text-xs font-black text-emerald-600 mt-1">{formataMoeda(p.precoVenda)}</p>
                 </div>
                 <button onClick={() => dispararImpressaoEtiqueta(p)} className="bg-emerald-600 text-white text-xs font-black px-4 py-2.5 rounded-lg shadow-sm">🖨️ Imprimir</button>
