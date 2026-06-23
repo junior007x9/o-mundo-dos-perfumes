@@ -36,19 +36,15 @@ export default async function ProdutosPage({
 
   const listaProdutosCompleta = await db.select().from(produtos).orderBy(desc(produtos.id));
 
-  // 🚀 APLICA O FILTRO DE TEXTO E O FILTRO DE ESTOQUE SIMULTANEAMENTE (CORRIGIDO PARA TYPESCRIPT)
   const listaProdutos = listaProdutosCompleta.filter((p) => {
-    // 1. Verifica o texto
     let textoBate = true;
     if (q) {
       const termo = q.toLowerCase();
-      // O "??" garante que se o campo for nulo, ele retorna "false" (um booleano perfeito para a Vercel)
       textoBate = p.nome.toLowerCase().includes(termo) ||
                   (p.codigoBarras?.toLowerCase().includes(termo) ?? false) ||
                   (p.descricao?.toLowerCase().includes(termo) ?? false);
     }
 
-    // 2. Verifica a quantidade em estoque escolhida
     let estoqueBate = true;
     if (filtroEstoque === 'com_estoque') {
       estoqueBate = p.estoque > 0;
@@ -111,6 +107,7 @@ export default async function ProdutosPage({
     redirect('/dashboard/produtos?msg=Produto guardado com sucesso no estoque!');
   }
 
+  // 🚀 LÓGICA DE EXCLUSÃO CORRIGIDA E BLINDADA
   async function excluirProduto(formData: FormData) {
     'use server';
     const usu = await getUsuarioLogado();
@@ -124,17 +121,51 @@ export default async function ProdutosPage({
     const resProd = await db.select().from(produtos).where(eq(produtos.id, idParaExcluir)).limit(1);
     
     if (resProd.length > 0) {
+      const produtoApagado = resProd[0];
+
+      // Se for um KIT, desmembra os produtos devolvendo as quantidades ao estoque
+      if (produtoApagado.nome.startsWith('🎁 Kit:')) {
+        // Formato esperado da descrição do kit: "Contém: Perfume X, Sabonete Y"
+        const descKit = produtoApagado.descricao || '';
+        const prefixoDesc = 'Contém: ';
+        
+        if (descKit.startsWith(prefixoDesc)) {
+          const nomesDosItens = descKit.substring(prefixoDesc.length).split(', ').map(n => n.trim());
+          
+          // Busca todos os produtos ativos cujos nomes estejam nessa lista
+          const listaAtual = await db.select().from(produtos);
+          
+          for (const nomeItem of nomesDosItens) {
+            const prodAlvo = listaAtual.find(p => p.nome === nomeItem);
+            if (prodAlvo) {
+              // Devolve a quantidade total de kits em estoque para os itens individuais
+              await db.update(produtos)
+                .set({ estoque: prodAlvo.estoque + produtoApagado.estoque })
+                .where(eq(produtos.id, prodAlvo.id));
+            }
+          }
+        }
+        
+        await db.insert(logsSistema).values({
+          descricao: `♻️ Kit desmanchado e excluído: "${produtoApagado.nome}". Os itens internos retornaram ao estoque.`,
+          data: new Date().toISOString(),
+          categoria: 'produto',
+          usuarioNome: nomeUsuario
+        });
+      } else {
+        await db.insert(logsSistema).values({
+          descricao: `🗑️ Produto excluído permanentemente: "${produtoApagado.nome}".`,
+          data: new Date().toISOString(),
+          categoria: 'produto',
+          usuarioNome: nomeUsuario
+        });
+      }
+
       await db.delete(itensVenda).where(eq(itensVenda.idProduto, idParaExcluir));
-      await db.insert(logsSistema).values({
-        descricao: `🗑️ Produto excluído permanentemente: "${resProd[0].nome}".`,
-        data: new Date().toISOString(),
-        categoria: 'produto',
-        usuarioNome: nomeUsuario
-      });
       await db.delete(produtos).where(eq(produtos.id, idParaExcluir));
     }
 
-    redirect('/dashboard/produtos?msg=Produto apagado definitivamente do sistema!');
+    redirect('/dashboard/produtos?msg=Item apagado e estoque reorganizado com sucesso!');
   }
 
   async function montarKit(formData: FormData) {
