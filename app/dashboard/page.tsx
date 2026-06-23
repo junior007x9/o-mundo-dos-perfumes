@@ -15,8 +15,12 @@ export default function DashboardPage() {
   const [usuarioNome, setUsuarioNome] = useState('');
   const [logs, setLogs] = useState<any[]>([]);
 
-  // 🚀 Controle das abas
+  // 🚀 Controle unificado de todas as abas estratégicas
   const [abaAtiva, setAbaAtiva] = useState('geral');
+
+  // Estados para as Comissões
+  const [metaLoja, setMetaLoja] = useState<number>(50000); 
+  const [taxaComissao, setTaxaComissao] = useState<number>(5);
 
   useEffect(() => {
     carregar();
@@ -80,6 +84,7 @@ export default function DashboardPage() {
     window.open(`https://wa.me/${telefone}?text=${encodeURIComponent(textoCobranca)}`, '_blank');
   };
 
+  // 🚀 NOVO: DISPARO DE PÓS-VENDA E FIDELIZAÇÃO NO CRM
   const handleEnviarPosVendaCRM = (telefoneBase: string, nomeCliente: string, diasUltimaCompra: number) => {
     let telefone = telefoneBase.replace(/\D/g, ''); 
     if (telefone && !telefone.startsWith('55') && telefone.length >= 10) {
@@ -92,6 +97,7 @@ export default function DashboardPage() {
     } else {
       texto += `Passando para agradecer a preferência e saber se você está gostando do(s) produto(s) que adquiriu recentemente conosco! Qualquer dúvida, estamos à disposição. 💖`;
     }
+
     window.open(`https://wa.me/${telefone}?text=${encodeURIComponent(texto)}`, '_blank');
   };
 
@@ -162,6 +168,7 @@ export default function DashboardPage() {
 
     const vendasValidasRelatorio = dados.listaVendas.filter((v: any) => v.status !== 'cancelada');
     const totalRelatorio = vendasValidasRelatorio.reduce((acc: number, v: any) => acc + v.total, 0);
+    const totalCancelado = dados.listaVendas.filter((v: any) => v.status === 'cancelada').reduce((acc: number, v: any) => acc + v.total, 0);
     const dataEmissao = new Date().toLocaleString('pt-BR');
 
     const linhasTabela = dados.listaVendas.map((v: any) => {
@@ -243,6 +250,9 @@ export default function DashboardPage() {
   const totalVendidoMes = vendasMes.reduce((acc: number, v: any) => acc + v.total, 0);
   const totalVendidoSempre = vendasValidas.reduce((acc: number, v: any) => acc + v.total, 0);
   
+  const produtosBaixoEstoque = listaProdutos.filter((p: any) => p.estoque > 0 && p.estoque <= 5);
+  const produtosSemEstoque = listaProdutos.filter((p: any) => p.estoque === 0);
+
   const obterPagamento = (v: any) => String(v.formaPagamento || '').toLowerCase();
 
   const hojeDinheiro = vendasHoje.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'dinheiro', v.total), 0);
@@ -300,6 +310,8 @@ export default function DashboardPage() {
     .map((p: any) => ({ ...p, qtdVendida: vendasPorProduto[p.id] || 0 }))
     .sort((a: any, b: any) => b.qtdVendida - a.qtdVendida);
 
+  const topProduto = produtosMaisVendidos.length > 0 && produtosMaisVendidos[0].qtdVendida > 0 ? produtosMaisVendidos[0] : null;
+  const totalProdutosCadastrados = listaProdutos.length;
   const valorPotencialAlcancado = listaProdutos.reduce((acc: number, p: any) => acc + (Number(p.precoVenda || 0) * Number(p.estoque || 0)), 0);
   const capitalInvestidoEstoque = listaProdutos.reduce((acc: number, p: any) => acc + (Number(p.precoCusto || 0) * (p.estoque > 0 ? Number(p.estoque) : 0)), 0);
 
@@ -313,17 +325,29 @@ export default function DashboardPage() {
 
   const clientNameMapSecure = new Map<number, string>(listaClientes.map((c: any) => [Number(c.id), String(c.nome || 'Consumidor Fixo')]));
 
+  // 🚀 LÓGICA DO CRM: Histórico de Compras (LTV)
   const crmClientes = listaClientes.map((cliente: any) => {
     const comprasDoCliente = vendasValidas.filter((v: any) => Number(v.idCliente) === Number(cliente.id));
     const totalGasto = comprasDoCliente.reduce((acc: number, v: any) => acc + Number(v.total || 0), 0);
+    // Como a lista de vendas está descrescente (recente primeiro), a venda[0] é a última
     const dataUltimaCompra = comprasDoCliente.length > 0 ? comprasDoCliente[0].data : null;
+    
     let diasSemComprar = 0;
     if (dataUltimaCompra) {
       const msDiff = new Date().getTime() - new Date(dataUltimaCompra).getTime();
       diasSemComprar = Math.floor(msDiff / (1000 * 60 * 60 * 24));
     }
+
     return { ...cliente, totalGasto, qtdCompras: comprasDoCliente.length, dataUltimaCompra, diasSemComprar };
-  }).sort((a: any, b: any) => b.totalGasto - a.totalGasto); 
+  }).sort((a: any, b: any) => b.totalGasto - a.totalGasto); // Ranking de quem gasta mais
+
+  // 🚀 LÓGICA COMISSÕES
+  const vendasPorVendedor = vendasMes.reduce((acc: any, v: any) => {
+    const id = v.idVendedor ? String(v.idVendedor) : 'Loja Principal';
+    acc[id] = (acc[id] || 0) + Number(v.total || 0);
+    return acc;
+  }, {});
+  const progressoMeta = Math.min((totalVendidoMes / metaLoja) * 100, 100);
 
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
@@ -338,22 +362,21 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* MENU DE ABAS */}
+      {/* 🚀 NOVO MENU COMPLETO DE ABAS */}
       <div className="flex overflow-x-auto gap-2 border-b border-zinc-200 pb-px scrollbar-none">
         <button onClick={() => setAbaAtiva('geral')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'geral' ? 'border-[#6A283A] text-[#6A283A]' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>📊 Resumo</button>
         <button onClick={() => setAbaAtiva('receber')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'receber' ? 'border-purple-600 text-purple-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>📝 A Receber</button>
         <button onClick={() => setAbaAtiva('crm')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'crm' ? 'border-pink-600 text-pink-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>🛍️ CRM (Clientes)</button>
         <button onClick={() => setAbaAtiva('dre')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'dre' ? 'border-blue-600 text-blue-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>🧮 DRE Gerencial</button>
         <button onClick={() => setAbaAtiva('giro')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'giro' ? 'border-orange-500 text-orange-500' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>📦 Giro / Compras</button>
+        <button onClick={() => setAbaAtiva('comissoes')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'comissoes' ? 'border-amber-500 text-amber-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>🎖️ Comissões</button>
         <button onClick={() => setAbaAtiva('etiquetas')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'etiquetas' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>🏷️ Etiquetas</button>
       </div>
 
-      {/* ==================== ABA GERAL COM 5 CARDS ==================== */}
+      {/* ==================== ABA GERAL ==================== */}
       {abaAtiva === 'geral' && (
         <div className="space-y-6 animate-in fade-in duration-300">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-6">
-            
-            {/* 1. Vendas de Hoje */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-[#6A283A] flex flex-col justify-between">
               <div><h3 className="text-xs font-bold text-zinc-500 uppercase">Vendas de Hoje</h3><p className="text-2xl font-black text-[#6A283A] mt-2">{formataMoeda(totalVendidoHoje)}</p></div>
               <div className="mt-4 pt-3 border-t border-zinc-100 grid grid-cols-2 gap-2 text-[10px] font-bold text-zinc-500 text-center">
@@ -365,7 +388,6 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* 2. Faturamento Mês */}
             <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-[#A56877] flex flex-col justify-between">
               <div><h3 className="text-xs font-bold text-zinc-500 uppercase">Faturamento Mês</h3><p className="text-2xl font-black text-[#A56877] mt-2">{formataMoeda(totalVendidoMes)}</p></div>
               <div className="mt-4 pt-3 border-t border-zinc-100 grid grid-cols-2 gap-2 text-[10px] font-bold text-zinc-500 text-center">
@@ -377,46 +399,16 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* 3. Venda Direta (COM INFORMATIVO) */}
             <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-purple-600 flex flex-col justify-between">
-              <div>
-                <h3 className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-1 cursor-help" title="Vendas pendentes e acordos fechados fora da modalidade de balcão à vista.">
-                  Total Venda Direta ℹ️
-                </h3>
-                <p className="text-2xl font-black text-purple-600 mt-2">{formataMoeda(totalVendaDiretaSempre)}</p>
-                <p className="text-[9px] text-zinc-400 mt-1 leading-tight border-b border-zinc-100 pb-2">Vendas externas/parceladas pendentes de controle (Contas a Receber).</p>
-              </div>
-              <div className="mt-2 text-xs text-zinc-500 font-bold flex justify-between">
-                <span>Balcão Loja:</span>
-                <span className="text-zinc-800">{formataMoeda(totalVendidoSempre - totalVendaDiretaSempre)}</span>
-              </div>
+              <div><h3 className="text-xs font-bold text-zinc-500 uppercase">Total Venda Direta</h3><p className="text-2xl font-black text-purple-600 mt-2">{formataMoeda(totalVendaDiretaSempre)}</p></div>
+              <div className="mt-4 pt-2 border-t border-zinc-100 text-xs text-zinc-500 font-bold flex justify-between"><span>Balcão:</span><span className="text-zinc-800">{formataMoeda(totalVendidoSempre - totalVendaDiretaSempre)}</span></div>
             </div>
 
-            {/* 4. Custos CMV (COM INFORMATIVO) */}
             <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-orange-500 flex flex-col justify-between">
-              <div>
-                <h3 className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-1 cursor-help" title="Custo das Mercadorias Vendidas. Valor de compra de todos os produtos que já foram vendidos.">
-                  Custos (CMV) Mês ℹ️
-                </h3>
-                <p className="text-2xl font-black text-orange-600 mt-2">{formataMoeda(custoMercadoriaMes)}</p>
-                <p className="text-[9px] text-zinc-400 mt-1 leading-tight">Valor bruto de custo investido apenas nas mercadorias que já saíram do estoque.</p>
-              </div>
-              <p className="text-xs text-zinc-400 mt-4 pt-2 border-t border-zinc-100">Custo Histórico Total: <strong>{formataMoeda(custoMercadoriaTotal)}</strong></p>
+              <div><h3 className="text-xs font-bold text-zinc-500 uppercase">Custos (CMV) Mês</h3><p className="text-2xl font-black text-orange-600 mt-2">{formataMoeda(custoMercadoriaMes)}</p></div>
             </div>
-
-            {/* 5. Meta em Estoque (O RETORNO DO CARD) */}
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-emerald-500 flex flex-col justify-between">
-              <div>
-                <h3 className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-1">💰 Meta em Estoque</h3>
-                <p className="text-2xl font-black text-emerald-600 mt-2">{formataMoeda(valorPotencialAlcancado)}</p>
-                <p className="text-[10px] text-zinc-400 mt-1">Valor financeiro total de venda a realizar no estoque físico atual.</p>
-              </div>
-              <p className="text-xs text-zinc-400 mt-4 pt-2 border-t border-zinc-100">Capital Investido Atual: <strong>{formataMoeda(capitalInvestidoEstoque)}</strong></p>
-            </div>
-
           </div>
 
-          {/* Histórico Geral */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD]">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-4">
               <h2 className="text-xl font-bold text-[#6A283A]">Histórico de Vendas</h2>
@@ -451,6 +443,7 @@ export default function DashboardPage() {
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300">
           <div className="mb-4">
             <h2 className="text-xl font-black text-purple-700">📑 Monitoramento Dinâmico de Contas a Receber</h2>
+            <p className="text-zinc-500 text-sm mt-0.5">Gerencie parcelamentos ativos e envie cobranças rápidas por WhatsApp com um clique.</p>
           </div>
           <div className="overflow-x-auto rounded-lg border border-[#E0DDDD]">
             <table className="w-full text-left whitespace-nowrap">
@@ -489,39 +482,68 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ==================== ABA CRM DE CLIENTES (FIDELIZAÇÃO) ==================== */}
+      {/* ==================== 🚀 NOVA ABA: CRM DE CLIENTES (FIDELIZAÇÃO) ==================== */}
       {abaAtiva === 'crm' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300">
           <div className="mb-6 flex flex-col md:flex-row justify-between md:items-end gap-4">
             <div>
               <h2 className="text-xl font-black text-pink-600">🛍️ Histórico de Consumo (CRM)</h2>
-              <p className="text-zinc-500 text-sm mt-0.5">Ranking de clientes que mais compram na loja e funil de pós-venda.</p>
+              <p className="text-zinc-500 text-sm mt-0.5">Ranking de clientes que mais compram na loja (LTV) e dias sem comprar para Pós-Venda.</p>
             </div>
-            <div className="bg-pink-50 border border-pink-200 text-pink-700 px-4 py-2 rounded-lg text-sm font-bold">Base Total: {listaClientes.length} Clientes</div>
+            <div className="bg-pink-50 border border-pink-200 text-pink-700 px-4 py-2 rounded-lg text-sm font-bold">
+              Base Total: {listaClientes.length} Clientes Cadastrados
+            </div>
           </div>
+
           <div className="overflow-x-auto rounded-lg border border-[#E0DDDD]">
             <table className="w-full text-left whitespace-nowrap">
               <thead className="bg-pink-50 border-b border-pink-200">
-                <tr><th className="p-3 text-xs font-bold text-pink-900">🏆 Ranking Cliente</th><th className="p-3 text-xs font-bold text-pink-900 text-center">Nº de Compras</th><th className="p-3 text-xs font-bold text-pink-900">Total Gasto na Loja</th><th className="p-3 text-xs font-bold text-pink-900">Última Visita</th><th className="p-3 text-xs font-bold text-pink-900 text-center">Relacionamento</th></tr>
+                <tr>
+                  <th className="p-3 text-xs font-bold text-pink-900">🏆 Ranking Cliente</th>
+                  <th className="p-3 text-xs font-bold text-pink-900 text-center">Nº de Compras</th>
+                  <th className="p-3 text-xs font-bold text-pink-900">Total Gasto na Loja</th>
+                  <th className="p-3 text-xs font-bold text-pink-900">Última Visita</th>
+                  <th className="p-3 text-xs font-bold text-pink-900 text-center">Relacionamento</th>
+                </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 font-semibold text-sm">
                 {crmClientes.map((cliente: any, index: number) => (
-                  <tr key={cliente.id} className="hover:bg-pink-50/20">
-                    <td className="p-3 flex items-center gap-3"><span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${index < 3 ? 'bg-amber-400 text-amber-900' : 'bg-zinc-100 text-zinc-500'}`}>{index + 1}º</span><div><p className="text-zinc-900 font-black">{cliente.nome}</p><p className="text-[10px] font-bold text-zinc-400">{cliente.telefone || 'Sem WhatsApp'}</p></div></td>
+                  <tr key={cliente.id} className="hover:bg-pink-50/20 transition-colors">
+                    <td className="p-3 flex items-center gap-3">
+                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${index < 3 ? 'bg-amber-400 text-amber-900 shadow-sm' : 'bg-zinc-100 text-zinc-500'}`}>
+                        {index + 1}º
+                      </span>
+                      <div>
+                        <p className="text-zinc-900 font-black">{cliente.nome}</p>
+                        <p className="text-[10px] font-bold text-zinc-400">{cliente.telefone || 'Sem WhatsApp'}</p>
+                      </div>
+                    </td>
                     <td className="p-3 text-center text-zinc-600">{cliente.qtdCompras}x</td>
                     <td className="p-3 font-black text-pink-600">{formataMoeda(cliente.totalGasto)}</td>
                     <td className="p-3">
                       {cliente.dataUltimaCompra ? (
-                        <div><p className="text-zinc-800">{new Date(cliente.dataUltimaCompra).toLocaleDateString('pt-BR')}</p><p className={`text-[10px] font-bold ${cliente.diasSemComprar > 60 ? 'text-red-500' : 'text-green-500'}`}>{cliente.diasSemComprar === 0 ? 'Comprou Hoje' : `Há ${cliente.diasSemComprar} dias`}</p></div>
-                      ) : (<span className="text-zinc-400 text-xs">Nunca comprou</span>)}
+                        <div>
+                          <p className="text-zinc-800">{new Date(cliente.dataUltimaCompra).toLocaleDateString('pt-BR')}</p>
+                          <p className={`text-[10px] font-bold ${cliente.diasSemComprar > 60 ? 'text-red-500' : 'text-green-500'}`}>
+                            {cliente.diasSemComprar === 0 ? 'Comprou Hoje' : `Há ${cliente.diasSemComprar} dias`}
+                          </p>
+                        </div>
+                      ) : (
+                        <span className="text-zinc-400 text-xs">Nunca comprou</span>
+                      )}
                     </td>
                     <td className="p-3 text-center">
-                      <button disabled={!cliente.telefone} onClick={() => handleEnviarPosVendaCRM(cliente.telefone, cliente.nome, cliente.diasSemComprar)} className={`text-[11px] font-black px-4 py-2 rounded-lg uppercase ${cliente.telefone ? 'bg-pink-600 text-white hover:bg-pink-700' : 'bg-zinc-200 text-zinc-400 cursor-not-allowed'}`}>
-                        {cliente.telefone ? '💬 Pós-Venda' : 'Sem Contato'}
+                      <button 
+                        disabled={!cliente.telefone}
+                        onClick={() => handleEnviarPosVendaCRM(cliente.telefone, cliente.nome, cliente.diasSemComprar)} 
+                        className={`text-[11px] font-black px-4 py-2 rounded-lg uppercase transition-all shadow-sm ${cliente.telefone ? 'bg-pink-600 text-white hover:bg-pink-700' : 'bg-zinc-200 text-zinc-400 cursor-not-allowed'}`}
+                      >
+                        {cliente.telefone ? '💬 Falar no Whats' : 'Sem Contato'}
                       </button>
                     </td>
                   </tr>
                 ))}
+                {crmClientes.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-zinc-400">Nenhum cliente cadastrado com compras ainda.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -587,19 +609,41 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* ==================== ABA COMISSÕES ==================== */}
+      {abaAtiva === 'comissoes' && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-4 mb-6">
+            <div><h2 className="text-xl font-black text-amber-600">🎖️ Metas e Comissões</h2></div>
+            <div className="flex gap-3">
+              <div><label className="block text-[10px] font-black text-zinc-500 uppercase mb-1">Meta Loja (R$)</label><input type="number" value={metaLoja} onChange={(e) => setMetaLoja(Number(e.target.value) || 1)} className="p-2 border border-zinc-300 rounded-lg text-sm font-black w-32 outline-none focus:border-amber-500" /></div>
+              <div><label className="block text-[10px] font-black text-zinc-500 uppercase mb-1">Comissão (%)</label><input type="number" value={taxaComissao} onChange={(e) => setTaxaComissao(Number(e.target.value) || 0)} className="p-2 border border-zinc-300 rounded-lg text-sm font-black w-24 outline-none focus:border-amber-500" /></div>
+            </div>
+          </div>
+          <div className="mb-8">
+            <div className="flex justify-between items-end mb-2"><span className="text-sm font-bold text-zinc-600">Progresso da Meta Mensal</span><span className="font-black text-amber-600 text-lg">{Math.min((totalVendidoMes / metaLoja) * 100, 100).toFixed(1)}%</span></div>
+            <div className="w-full bg-zinc-100 rounded-full h-4 overflow-hidden"><div className="bg-gradient-to-r from-amber-400 to-orange-500 h-4 rounded-full" style={{ width: `${Math.min((totalVendidoMes / metaLoja) * 100, 100)}%` }}></div></div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Object.entries(vendasMes.reduce((acc: any, v: any) => { const id = v.idVendedor ? String(v.idVendedor) : 'Loja Principal'; acc[id] = (acc[id] || 0) + Number(v.total || 0); return acc; }, {})).map(([idVendedor, total]: [string, any]) => (
+              <div key={idVendedor} className="border border-amber-200 bg-amber-50/30 rounded-xl p-5 hover:shadow-md relative overflow-hidden">
+                <div className="absolute top-0 right-0 bg-amber-200 text-amber-800 text-[10px] font-black px-3 py-1 rounded-bl-lg uppercase">ID: {idVendedor}</div>
+                <h3 className="font-black text-zinc-800 text-lg mb-4 mt-2">{idVendedor === 'Loja Principal' ? 'Sede / Balcão Fixo' : `Vendedor #${idVendedor}`}</h3>
+                <div className="flex justify-between items-center text-sm mb-2"><span className="text-zinc-500 font-bold">Vendido:</span><span className="font-black text-zinc-800">{formataMoeda(Number(total))}</span></div>
+                <div className="flex justify-between items-center text-sm border-t border-amber-200 pt-2"><span className="text-amber-700 font-black uppercase">Comissão:</span><span className="font-black text-amber-600 text-xl">{formataMoeda(Number(total) * (taxaComissao / 100))}</span></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ==================== ABA ETIQUETAS ==================== */}
       {abaAtiva === 'etiquetas' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300">
-          <div className="mb-4">
-            <h2 className="text-xl font-black text-emerald-700">🏷️ Gerador Digital de Etiquetas</h2>
-          </div>
+          <div className="mb-4"><h2 className="text-xl font-black text-emerald-700">🏷️ Emissor de Etiquetas de Gôndola</h2></div>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             {listaProdutos.map((p: any) => (
-              <div key={p.id} className="p-4 border border-zinc-200 rounded-xl hover:border-emerald-500 transition-all bg-zinc-50 flex items-center justify-between gap-4">
-                <div className="truncate">
-                  <p className="font-black text-sm text-zinc-800 truncate" title={p.nome}>{String(p.nome)}</p>
-                  <p className="text-xs font-black text-emerald-600 mt-1">{formataMoeda(p.precoVenda)}</p>
-                </div>
+              <div key={p.id} className="p-4 border border-zinc-200 rounded-xl bg-zinc-50 flex items-center justify-between gap-4">
+                <div className="truncate"><p className="font-black text-sm text-zinc-800 truncate">{String(p.nome)}</p><p className="text-xs font-black text-emerald-600">{formataMoeda(p.precoVenda)}</p></div>
                 <button onClick={() => dispararImpressaoEtiqueta(p)} className="bg-emerald-600 text-white text-xs font-black px-4 py-2.5 rounded-lg shadow-sm">🖨️ Imprimir</button>
               </div>
             ))}

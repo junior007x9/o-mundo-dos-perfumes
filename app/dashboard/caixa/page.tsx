@@ -26,6 +26,9 @@ export default function CaixaPage() {
   const [vendaSucesso, setVendaSucesso] = useState<boolean>(false);
   const [dadosUltimaVenda, setDadosUltimaVenda] = useState<any>(null);
 
+  // 🚀 TRAVA DE SEGURANÇA: Bloqueia o botão enquanto salva
+  const [processandoVenda, setProcessandoVenda] = useState(false);
+
   const [buscaTexto, setBuscaTexto] = useState('');
   const [cameraAberta, setCameraAberta] = useState(false);
   const inputBuscaRef = useRef<HTMLInputElement>(null);
@@ -231,46 +234,62 @@ export default function CaixaPage() {
     (pagamento === 'dinheiro' && valorRecebido !== '' && Number(valorRecebido) < totalComDesconto) ||
     (pagamento === 'venda_direta' && !clienteSelecionado)); 
 
+  // 🚀 LÓGICA DE FINALIZAÇÃO BLINDADA
   const handleFinalizarVenda = async () => {
-    if (carrinho.length === 0) return;
-
-    const formaEnvio = pagamento === 'multiplo'
-      ? `multiplo:dinheiro=${(Number(valoresMultiplos.dinheiro) || 0) - trocoMultiplo};pix=${Number(valoresMultiplos.pix) || 0};credito=${Number(valoresMultiplos.credito) || 0};debito=${Number(valoresMultiplos.debito) || 0}${observacaoMultipla.trim() ? `;obs=${observacaoMultipla.replace(/[:;=]/g, ' ')}` : ''}`
-      : pagamento === 'venda_direta' && observacaoDireta.trim()
-        ? `venda_direta:obs=${observacaoDireta.replace(/[:;=]/g, ' ')}`
-        : pagamento;
-
-    const clienteObj = clientesDB.find(c => c.id.toString() === clienteSelecionado);
-
-    setDadosUltimaVenda({ 
-      itens: [...carrinho], 
-      total: totalComDesconto, 
-      data: new Date().toISOString(),
-      pagamento: formaEnvio,
-      clienteNome: clienteObj ? clienteObj.nome : 'Consumidor Final',
-      vendedorNome: vendedorLogado ? vendedorLogado.nome : 'Sistema'
-    });
+    // Se o botão já foi clicado (está processando) ou o carrinho está vazio, não faz nada
+    if (carrinho.length === 0 || processandoVenda) return;
     
-    const idCliente = clienteSelecionado ? Number(clienteSelecionado) : undefined;
-    const idVendedor = vendedorLogado ? Number(vendedorLogado.id) : undefined;
-    
-    await finalizarVenda(caixa.id, carrinho, totalComDesconto, formaEnvio, idCliente, idVendedor);
-    
-    const vendasAtualizadas = await getVendasDoCaixa(caixa.id);
-    setVendasCaixa(vendasAtualizadas);
+    // Trava o botão imediatamente!
+    setProcessandoVenda(true);
 
-    setCarrinho([]);
-    setValorRecebido('');
-    setDesconto('');
-    setValoresMultiplos({ dinheiro: '', pix: '', credito: '', debito: '' });
-    setObservacaoDireta('');
-    setObservacaoMultipla(''); 
-    setPagamento('dinheiro');
-    setClienteSelecionado(''); 
-    setVendaSucesso(true);
-    
-    const novaLista = await getProdutosPDV();
-    setProdutos(novaLista);
+    try {
+      const formaEnvio = pagamento === 'multiplo'
+        ? `multiplo:dinheiro=${(Number(valoresMultiplos.dinheiro) || 0) - trocoMultiplo};pix=${Number(valoresMultiplos.pix) || 0};credito=${Number(valoresMultiplos.credito) || 0};debito=${Number(valoresMultiplos.debito) || 0}${observacaoMultipla.trim() ? `;obs=${observacaoMultipla.replace(/[:;=]/g, ' ')}` : ''}`
+        : pagamento === 'venda_direta' && observacaoDireta.trim()
+          ? `venda_direta:obs=${observacaoDireta.replace(/[:;=]/g, ' ')}`
+          : pagamento;
+
+      const clienteObj = clientesDB.find(c => c.id.toString() === clienteSelecionado);
+
+      setDadosUltimaVenda({ 
+        itens: [...carrinho], 
+        total: totalComDesconto, 
+        data: new Date().toISOString(),
+        pagamento: formaEnvio,
+        clienteNome: clienteObj ? clienteObj.nome : 'Consumidor Final',
+        vendedorNome: vendedorLogado ? vendedorLogado.nome : 'Sistema'
+      });
+      
+      const idCliente = clienteSelecionado ? Number(clienteSelecionado) : undefined;
+      const idVendedor = vendedorLogado ? Number(vendedorLogado.id) : undefined;
+      
+      // Salva a venda APENAS UMA VEZ
+      await finalizarVenda(caixa.id, carrinho, totalComDesconto, formaEnvio, idCliente, idVendedor);
+      
+      const vendasAtualizadas = await getVendasDoCaixa(caixa.id);
+      setVendasCaixa(vendasAtualizadas);
+
+      // Limpa os estados e mostra a tela de sucesso
+      setCarrinho([]);
+      setValorRecebido('');
+      setDesconto('');
+      setValoresMultiplos({ dinheiro: '', pix: '', credito: '', debito: '' });
+      setObservacaoDireta('');
+      setObservacaoMultipla(''); 
+      setPagamento('dinheiro');
+      setClienteSelecionado(''); 
+      setVendaSucesso(true);
+      
+      const novaLista = await getProdutosPDV();
+      setProdutos(novaLista);
+
+    } catch (error) {
+      console.error("Erro ao salvar a venda:", error);
+      alert("Ocorreu um erro na rede ao salvar a venda. Tente novamente.");
+    } finally {
+      // Independentemente de dar certo ou erro, libera o botão no fim do processo
+      setProcessandoVenda(false);
+    }
   };
 
   const dispararImpressaoTermica = () => {
@@ -659,12 +678,13 @@ export default function CaixaPage() {
                 {Number(desconto) > 0 && <span className="text-[9px] text-zinc-400 line-through mt-0.5">{formataMoeda(totalCompra)}</span>}
               </div>
 
+              {/* 🚀 BOTÃO COM TRAVA DE SEGURANÇA E FEEDBACK VISUAL */}
               <button 
                 onClick={handleFinalizarVenda} 
-                disabled={botaoDesabilitado} 
+                disabled={botaoDesabilitado || processandoVenda} 
                 className="flex-[2] bg-[#6A283A] text-white font-black rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#521e2d] uppercase tracking-wider text-sm flex items-center justify-center transition-all"
               >
-                ✅ Finalizar
+                {processandoVenda ? '⏳ Processando...' : '✅ Finalizar'}
               </button>
             </div>
 
