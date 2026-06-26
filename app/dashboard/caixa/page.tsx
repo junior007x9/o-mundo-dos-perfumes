@@ -65,7 +65,6 @@ export default function CaixaPage() {
     carregarDados();
   }, []);
 
-  // 🚀 TIMEOUT DE SEGURANÇA E REMOÇÃO DE DISTORÇÃO DE ASPECTO (CORRIGIDO)
   useEffect(() => {
     let html5QrCode: Html5Qrcode | null = null;
     
@@ -75,10 +74,8 @@ export default function CaixaPage() {
           html5QrCode = new Html5Qrcode("leitor-camera");
           const config = { 
             fps: 20, 
-            qrbox: { width: 280, height: 160 }, // Retângulo perfeito focado em códigos lineares de perfumes
-            experimentalFeatures: {
-              useBarCodeDetectorIfSupported: true
-            },
+            qrbox: { width: 280, height: 160 },
+            experimentalFeatures: { useBarCodeDetectorIfSupported: true },
             formatsToSupport: [
               Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
               Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E,
@@ -98,7 +95,7 @@ export default function CaixaPage() {
                 }).catch(err => console.error("Erro ao parar a câmera", err));
               }
             },
-            () => {} // Ignora erros de frame contínuos
+            () => {} 
           ).catch((err) => {
             console.error("Erro ao iniciar câmera", err);
             alert("Não foi possível acessar a câmera. Verifique as permissões do seu navegador.");
@@ -107,7 +104,7 @@ export default function CaixaPage() {
         } catch (e) {
           console.error("Erro de inicialização do container de vídeo", e);
         }
-      }, 300); // Aguarda o modal assentar na tela
+      }, 300); 
 
       return () => {
         clearTimeout(timer);
@@ -195,7 +192,7 @@ export default function CaixaPage() {
     }
     const itemExistente = carrinho.find((item) => item.id === produto.id);
     if (itemExistente) {
-      setCarrinho(carrinho.map(item => item.id === produto.id ? { ...item, grandfather: true, quantidade: item.quantidade + 1 } : item));
+      setCarrinho(carrinho.map(item => item.id === produto.id ? { ...item, quantidade: item.quantidade + 1 } : item));
     } else {
       setCarrinho([...carrinho, { ...produto, quantidade: 1 }]);
     }
@@ -283,8 +280,10 @@ export default function CaixaPage() {
       
       const novaLista = await getProdutosPDV();
       setProdutos(novaLista);
+
     } catch (error) {
-      alert("Erro ao processar venda.");
+      console.error("Erro ao salvar a venda:", error);
+      alert("Ocorreu um erro na rede ao salvar a venda. Tente novamente.");
     } finally {
       setProcessandoVenda(false);
     }
@@ -307,6 +306,7 @@ export default function CaixaPage() {
           <div class="divider"></div>
           <table><tbody>${dadosUltimaVenda.itens.map((i: any) => `<tr><td>${i.quantidade}x ${i.nome.substring(0,16)}</td><td class="right">R$ ${(i.quantidade * i.precoVenda).toFixed(2)}</td></tr>`).join('')}</tbody></table>
           <div class="divider"></div><div class="right bold">TOTAL: R$ ${dadosUltimaVenda.total.toFixed(2)}</div>
+          <div class="right" style="font-size:10px; margin-top:2px;">PAGO NO: ${dadosUltimaVenda.pagamento.startsWith('venda_direta') ? 'VENDA DIRETA (PARCELADO)' : formatarPagamento(dadosUltimaVenda.pagamento)}</div>
           <div class="divider"></div><div class="center">OBRIGADO PELA PREFERÊNCIA!</div>
           <script>window.onload=function(){window.print();setTimeout(()=>window.close(),500);}</script>
         </body>
@@ -317,11 +317,13 @@ export default function CaixaPage() {
 
   const enviarWhatsApp = () => {
     if (!dadosUltimaVenda) return;
-    let texto = `*O MUNDO DOS PERFUMES* 🛍*\nOlá ${dadosUltimaVenda.clienteNome !== 'Consumidor Final' ? dadosUltimaVenda.clienteNome : ''}! Obrigado pela preferência!\n\n*Atendente:* ${dadosUltimaVenda.vendedorNome}\n\n*Recibo da Compra:*\n`;
+    let texto = `*O MUNDO DOS PERFUMES* 🛍️\nOlá ${dadosUltimaVenda.clienteNome !== 'Consumidor Final' ? dadosUltimaVenda.clienteNome : ''}! Obrigado pela preferência!\n\n*Atendente:* ${dadosUltimaVenda.vendedorNome}\n\n*Recibo da Compra:*\n`;
     dadosUltimaVenda.itens.forEach((i: any) => {
       texto += `▪ ${i.quantidade}x ${i.nome} - R$ ${(i.quantidade * i.precoVenda).toFixed(2)}\n`;
     });
-    texto += `\n*Total Pago:* R$ ${dadosUltimaVenda.total.toFixed(2)}\n\nVolte Sempre! ✨`;
+    texto += `\n*Total Pago:* R$ ${dadosUltimaVenda.total.toFixed(2)}`;
+    texto += `\n*Forma de Pagamento:* ${dadosUltimaVenda.pagamento.startsWith('venda_direta') ? 'VENDA DIRETA (PARCELADO)' : formatarPagamento(dadosUltimaVenda.pagamento)}\n\nVolte Sempre! ✨`;
+    
     window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
   };
 
@@ -342,11 +344,11 @@ export default function CaixaPage() {
   };
 
   const resumoTurno = {
-    dinheiro: vendasValidas.reduce((acc, v) => acc + obterValorPorForma(v.formaPagamento, 'dinheiro', v.total), 0),
-    pix: vendasValidas.reduce((acc, v) => acc + obterValorPorForma(v.formaPagamento, 'pix', v.total), 0),
-    credito: vendasValidas.reduce((acc, v) => acc + obterValorPorForma(v.formaPagamento, 'credito', v.total), 0),
-    debito: vendasValidas.reduce((acc, v) => acc + obterValorPorForma(v.formaPagamento, 'debito', v.total), 0),
-    venda_direta: vendasValidas.reduce((acc, v) => acc + obterValorPorForma(v.formaPagamento, 'venda_direta', v.total), 0),
+    dinheiro: vendasValidas.reduce((acc, v) => acc + obterValorPorForma(v.formaPayment || v.formaPagamento, 'dinheiro', v.total), 0),
+    pix: vendasValidas.reduce((acc, v) => acc + obterValorPorForma(v.formaPayment || v.formaPagamento, 'pix', v.total), 0),
+    credito: vendasValidas.reduce((acc, v) => acc + obterValorPorForma(v.formaPayment || v.formaPagamento, 'credito', v.total), 0),
+    debito: vendasValidas.reduce((acc, v) => acc + obterValorPorForma(v.formaPayment || v.formaPagamento, 'debito', v.total), 0),
+    venda_direta: vendasValidas.reduce((acc, v) => acc + obterValorPorForma(v.formaPayment || v.formaPagamento, 'venda_direta', v.total), 0),
   };
   const totalVendidoTurno = resumoTurno.dinheiro + resumoTurno.pix + resumoTurno.credito + resumoTurno.debito + resumoTurno.venda_direta;
 
@@ -359,34 +361,79 @@ export default function CaixaPage() {
   const produtosFiltrados = produtos.filter((p) => {
     if (!buscaTexto.trim()) return true;
     const termo = buscaTexto.toLowerCase();
-    return String(p.nome || '').toLowerCase().includes(termo) ||
-           String(p.codigoBarras || '').toLowerCase().includes(termo) ||
-           String(p.marca || '').toLowerCase().includes(termo);
+    
+    const matchNome = String(p.nome || '').toLowerCase().includes(termo);
+    const matchBarra = String(p.codigoBarras || '').toLowerCase().includes(termo);
+    const matchMarca = String(p.marca || '').toLowerCase().includes(termo);
+    const matchPreco = String(p.precoVenda || '').includes(termo);
+
+    return matchNome || matchBarra || matchMarca || matchPreco;
   });
 
+  if (carregando) return <div className="p-8 text-center text-[#6A283A] font-bold text-lg">Carregando PDV...</div>;
+
+  if (!caixa) {
+    return (
+      <div className="max-w-md mx-auto mt-10 md:mt-20 bg-white p-6 md:p-8 rounded-xl shadow-xl border border-[#E0DDDD] text-center">
+        <div className="text-5xl mb-4 animate-pulse">🔒</div>
+        <h2 className="text-2xl font-black text-[#6A283A] mb-2">Caixa Fechado</h2>
+        <p className="text-zinc-500 mb-6 font-medium">É necessário abrir o caixa e informar o troco inicial.</p>
+        <form action={abrirCaixa} onSubmit={() => setTimeout(() => window.location.reload(), 1000)}>
+          <input name="saldoInicial" type="number" step="0.01" defaultValue="0" required className="w-full p-4 border border-[#E0DDDD] bg-zinc-50 focus:ring-2 focus:ring-[#6A283A] rounded-lg mb-6 text-center text-2xl font-bold outline-none text-zinc-800" />
+          <button type="submit" className="w-full bg-[#6A283A] text-white font-black py-4 rounded-lg hover:bg-[#521e2d] transition-all uppercase flex justify-center items-center gap-2 text-lg shadow-md">
+            🔑 Abrir Caixa Agora
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  if (vendaSucesso) {
+    return (
+      <div className="max-w-md mx-auto mt-10 md:mt-20 bg-white p-8 rounded-2xl shadow-xl border border-green-200 text-center animate-in fade-in zoom-in duration-300">
+        <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 animate-bounce">✓</div>
+        <h2 className="text-3xl font-black text-green-800 uppercase">Venda Feita!</h2>
+        <p className="text-zinc-600 mt-2 mb-8 text-lg">Pagamento registrado com sucesso.</p>
+        <div className="space-y-4">
+          <button onClick={dispararImpressaoTermica} className="w-full bg-[#6A283A] text-white font-black py-4 rounded-xl hover:bg-[#521e2d] transition-all uppercase shadow-md flex items-center justify-center gap-2 text-lg">
+            🖨️ Imprimir Recibo
+          </button>
+          <button onClick={enviarWhatsApp} className="w-full bg-[#25D366] text-white font-black py-4 rounded-xl hover:bg-[#128C7E] transition-all uppercase shadow-md flex items-center justify-center gap-2 text-lg">
+            📱 Enviar no WhatsApp
+          </button>
+          <button onClick={() => setVendaSucesso(false)} className="w-full bg-zinc-100 text-zinc-800 font-bold py-4 rounded-xl hover:bg-zinc-200 transition-all uppercase mt-4 text-lg">
+            🛒 Fazer Nova Venda
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col h-[calc(100vh-5rem)] lg:h-[calc(100vh-6rem)] gap-3 md:gap-4 overflow-hidden min-h-0">
+    // 🚀 LÓGICA DE ALTURA AJUSTADA: Solta a trava no telemóvel para permitir scroll total!
+    <div className="flex flex-col gap-3 md:gap-4 lg:h-[calc(100vh-5rem)] xl:h-[calc(100vh-6rem)] lg:overflow-hidden pb-10 lg:pb-0">
       
       {modalCliente && (
-        <div className="fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white p-6 md:p-8 rounded-2xl w-full max-w-sm shadow-2xl">
             <h3 className="font-black text-2xl text-[#6A283A] mb-2">Novo Cliente 👤</h3>
+            <p className="text-zinc-500 text-sm mb-6">Cadastre rapidamente para vincular à venda.</p>
             <form onSubmit={handleSalvarCliente} className="space-y-4">
               <div>
                 <label className="text-xs font-bold text-zinc-600 block mb-1">Nome Completo *</label>
-                <input type="text" required value={nomeCli} onChange={e => setNomeCli(e.target.value)} className="w-full p-3 rounded-lg bg-zinc-50 border border-zinc-300 font-bold text-sm outline-none" />
+                <input type="text" required value={nomeCli} onChange={e => setNomeCli(e.target.value)} className="w-full p-3 rounded-lg bg-zinc-50 border border-zinc-300 font-bold text-sm outline-none focus:ring-2 focus:ring-[#6A283A]" placeholder="Ex: João Silva" />
               </div>
               <div>
                 <label className="text-xs font-bold text-zinc-600 block mb-1">WhatsApp</label>
-                <input type="text" value={telefoneCli} onChange={handleTelefoneChange} className="w-full p-3 rounded-lg bg-zinc-50 border border-zinc-300 font-bold text-sm" placeholder="(00) 00000-0000" />
+                <input type="text" value={telefoneCli} onChange={handleTelefoneChange} className="w-full p-3 rounded-lg bg-zinc-50 border border-zinc-300 font-bold text-sm outline-none focus:ring-2 focus:ring-[#6A283A]" placeholder="(00) 00000-0000" />
               </div>
               <div>
                 <label className="text-xs font-bold text-zinc-600 block mb-1">Data de Nascimento</label>
-                <input type="text" value={dataNascCli} onChange={handleDataNascChange} className="w-full p-3 rounded-lg bg-zinc-50 border border-zinc-300 font-bold text-sm" placeholder="DD/MM/AAAA" />
+                <input type="text" value={dataNascCli} onChange={handleDataNascChange} className="w-full p-3 rounded-lg bg-zinc-50 border border-zinc-300 font-bold text-sm outline-none focus:ring-2 focus:ring-[#6A283A]" placeholder="DD/MM/AAAA" />
               </div>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setModalCliente(false)} className="flex-1 bg-zinc-200 text-zinc-800 font-bold py-3 rounded-xl text-sm">Cancelar</button>
-                <button type="submit" disabled={salvandoCli} className="flex-[2] bg-[#6A283A] text-white font-black py-3 rounded-xl uppercase text-sm">{salvandoCli ? 'Salvando...' : 'Salvar'}</button>
+                <button type="button" onClick={() => setModalCliente(false)} className="flex-1 bg-zinc-200 text-zinc-800 font-bold py-3 rounded-xl hover:bg-zinc-300 transition-colors uppercase text-sm">Cancelar</button>
+                <button type="submit" disabled={salvandoCli} className="flex-[2] bg-[#6A283A] text-white font-black py-3 rounded-xl hover:bg-[#521e2d] transition-colors uppercase shadow-md text-sm disabled:opacity-50">{salvandoCli ? 'Salvando...' : 'Salvar e Vincular'}</button>
               </div>
             </form>
           </div>
@@ -394,179 +441,258 @@ export default function CaixaPage() {
       )}
 
       {modalFechamento && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white p-6 md:p-8 rounded-2xl w-full max-w-sm shadow-2xl">
             <h3 className="font-black text-2xl text-[#6A283A] mb-2">Resumo do Dia 📊</h3>
+            <p className="text-zinc-500 text-sm mb-6">Confira os valores antes de encerrar o caixa.</p>
             <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 space-y-3 mb-6">
-              <div className="flex justify-between items-center"><span>💵 Dinheiro:</span><span className="font-black">{formataMoeda(resumoTurno.dinheiro)}</span></div>
-              <div className="flex justify-between items-center"><span>💠 PIX:</span><span className="font-black">{formataMoeda(resumoTurno.pix)}</span></div>
-              <div className="flex justify-between items-center"><span>💳 Crédito:</span><span className="font-black text-blue-700">{formataMoeda(resumoTurno.credito)}</span></div>
-              <div className="flex justify-between items-center"><span>💳 Débito:</span><span className="font-black text-teal-700">{formataMoeda(resumoTurno.debito)}</span></div>
-              <div className="flex justify-between items-center border-t border-dashed border-zinc-200 pt-2 text-[#6A283A]"><span>📝 Venda Direta:</span><span className="font-black">{formataMoeda(resumoTurno.venda_direta)}</span></div>
-              <div className="border-t border-zinc-200 pt-3 mt-3 flex justify-between items-center text-[#6A283A]"><span className="font-black text-sm">Total Vendido:</span><span className="font-black text-2xl">{formataMoeda(totalVendidoTurno)}</span></div>
+              <div className="flex justify-between items-center text-zinc-700">
+                <span className="font-bold">💵 Dinheiro:</span>
+                <span className="font-black text-lg">{formataMoeda(resumoTurno.dinheiro)}</span>
+              </div>
+              <div className="flex justify-between items-center text-zinc-700">
+                <span className="font-bold">💠 PIX:</span>
+                <span className="font-black text-lg">{formataMoeda(resumoTurno.pix)}</span>
+              </div>
+              <div className="flex justify-between items-center text-zinc-700">
+                <span className="font-bold">💳 Crédito:</span>
+                <span className="font-black text-lg text-blue-700">{formataMoeda(resumoTurno.credito)}</span>
+              </div>
+              <div className="flex justify-between items-center text-zinc-700">
+                <span className="font-bold">💳 Débito:</span>
+                <span className="font-black text-lg text-teal-700">{formataMoeda(resumoTurno.debito)}</span>
+              </div>
+              <div className="flex justify-between items-center text-zinc-700 border-t border-dashed border-zinc-200 pt-2 text-[#6A283A]">
+                <span className="font-bold">📝 Venda Direta:</span>
+                <span className="font-black text-lg">{formataMoeda(resumoTurno.venda_direta)}</span>
+              </div>
+              <div className="border-t border-zinc-200 pt-3 mt-3 flex justify-between items-center text-[#6A283A]">
+                <span className="font-black uppercase text-sm">Total Vendido:</span>
+                <span className="font-black text-2xl">{formataMoeda(totalVendidoTurno)}</span>
+              </div>
             </div>
             <div className="flex gap-3">
-              <button onClick={() => setModalFechamento(false)} className="flex-1 bg-zinc-200 text-zinc-800 font-bold py-3 rounded-xl text-sm">Voltar</button>
-              <button onClick={handleFecharCaixa} className="flex-[2] bg-red-600 text-white font-black py-3 rounded-xl text-sm uppercase">Encerrar Caixa</button>
+              <button onClick={() => setModalFechamento(false)} className="flex-1 bg-zinc-200 text-zinc-800 font-bold py-3 rounded-xl hover:bg-zinc-300 transition-colors uppercase text-sm">Voltar</button>
+              <button onClick={handleFecharCaixa} className="flex-[2] bg-red-600 text-white font-black py-3 rounded-xl hover:bg-red-700 transition-colors uppercase shadow-md text-sm">Encerrar Caixa</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* TELA DE SCANNER DA CÂMARA */}
       {cameraAberta && (
         <div className="fixed inset-0 bg-black/95 z-[9999] flex flex-col items-center justify-center p-4 backdrop-blur-md">
           <div className="w-full max-w-sm flex flex-col items-center gap-6">
-            <h2 className="text-2xl font-black text-white uppercase tracking-widest">Aponte para o Código</h2>
-            {/* O container interno do leitor */}
-            <div id="leitor-camera" className="w-full aspect-square bg-zinc-900 rounded-xl overflow-hidden border border-white/20"></div>
-            <button onClick={() => setCameraAberta(false)} className="w-full bg-white/10 text-white font-bold py-4 rounded-xl uppercase">✖ Fechar Lente</button>
+            <h2 className="text-2xl font-black text-white uppercase tracking-widest text-center">Lendo Código<br/><span className="text-xs font-normal text-zinc-400">Aponte a câmara para a etiqueta</span></h2>
+            <div id="leitor-camera" className="w-full aspect-video bg-black rounded-xl border border-white/20"></div>
+            <button onClick={() => setCameraAberta(false)} className="w-full bg-white/10 text-white font-bold py-4 rounded-xl uppercase">✖ Cancelar Leitura</button>
           </div>
         </div>
       )}
 
       {mostrarTutorial && (
-        <div className="flex-shrink-0 bg-gradient-to-r from-blue-50 to-white p-3 rounded-xl border border-blue-200 flex items-center gap-3 relative">
+        <div className="flex-shrink-0 bg-gradient-to-r from-blue-50 to-white p-3 rounded-xl border border-blue-200 shadow-sm flex items-center gap-3 relative">
           <button onClick={() => setMostrarTutorial(false)} className="absolute top-2 right-2 text-blue-400 hover:text-red-500 font-bold text-xs">✖</button>
           <div className="flex-1 pr-6">
             <h3 className="font-black text-blue-900 text-xs uppercase tracking-wide">Como registrar uma venda?</h3>
             <div className="text-blue-800/80 text-[11px] md:text-xs mt-1 font-medium flex flex-col md:flex-row md:gap-4 gap-1">
-              <p><strong>1</strong> Adicione os produtos. <strong>2</strong> Informe desconto ou cliente. <strong>3</strong> Conclua!</p>
+              <p><strong>1</strong> Adicione os produtos no catálogo.</p>
+              <p><strong>2</strong> Informe desconto ou cliente caso aplicável.</p>
+              <p><strong>3</strong> Escolha o pagamento (simples ou múltiplo) e conclua!</p>
             </div>
           </div>
         </div>
       )}
 
-      <div className="flex-shrink-0 bg-white p-2 rounded-xl shadow-sm border border-[#E0DDDD] flex gap-2">
+      {/* BARRA DE PESQUISA MAIS LARGA NO TELEMÓVEL */}
+      <div className="flex-shrink-0 bg-white p-2 md:p-3 rounded-xl shadow-sm border border-[#E0DDDD] flex gap-2">
         <div className="relative flex-1">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">🔍</span>
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-lg">🔍</span>
           <input 
             ref={inputBuscaRef} type="text" value={buscaTexto} onChange={(e) => setBuscaTexto(e.target.value)}
-            placeholder="Buscar por nome, marca, código ou preço..."
-            className="w-full pl-9 p-3 border border-[#E0DDDD] rounded-lg font-bold text-sm outline-none"
+            placeholder="Buscar por nome, marca, código..."
+            className="w-full pl-10 p-3 md:p-3 border border-[#E0DDDD] rounded-lg focus:ring-2 focus:ring-[#6A283A] outline-none font-bold text-sm md:text-base transition-all"
             autoFocus
           />
         </div>
-        <button onClick={() => setCameraAberta(true)} className="bg-[#6A283A] text-white px-4 py-2 rounded-lg font-black uppercase text-sm flex items-center gap-2 hover:bg-[#521e2d] transition-colors">
-          <span>📷</span> <span>Ler Código</span>
+        <button onClick={() => setCameraAberta(true)} className="bg-[#6A283A] text-white px-4 md:px-5 py-2 md:py-3 rounded-lg font-black uppercase text-sm md:text-base flex items-center gap-2 hover:bg-[#521e2d] transition-colors">
+          <span className="text-xl">📷</span> <span className="hidden sm:inline">Ler Código</span>
         </button>
       </div>
 
-      <div className="flex-1 flex flex-col lg:flex-row gap-3 min-h-0 overflow-hidden">
-        <div className="flex-1 bg-white flex flex-col rounded-xl shadow-sm border border-[#E0DDDD] min-h-0 overflow-hidden">
+      <div className="flex flex-col lg:flex-row gap-4 lg:flex-1 lg:min-h-0 lg:overflow-hidden">
+        
+        {/* 🚀 CATÁLOGO COM ALTURA FIXA NO MOBILE PARA NÃO EMPURRAR O CARRINHO */}
+        <div className="bg-white flex flex-col rounded-xl shadow-sm border border-[#E0DDDD] h-[35vh] lg:h-auto lg:flex-1 lg:min-h-0 lg:overflow-hidden">
           <div className="flex-shrink-0 flex justify-between items-center p-3 border-b border-[#E0DDDD] bg-zinc-50">
             <h2 className="text-lg font-black text-[#6A283A]">Catálogo Rápido</h2>
-            <button onClick={() => setModalFechamento(true)} className="text-xs font-bold bg-red-600 text-white px-3 py-1 rounded-full uppercase">🔒 Fechar Caixa</button>
+            <button onClick={() => setModalFechamento(true)} className="text-xs font-bold bg-red-600 text-white px-3 py-1 rounded-full uppercase shadow-sm">🔒 Fechar Caixa</button>
           </div>
           <div className="flex-1 overflow-y-auto p-3">
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2">
               {produtosFiltrados.map((p) => (
-                <button key={p.id} onClick={() => adicionarAoCarrinho(p)} disabled={p.estoque <= 0} className={`p-3 border-2 rounded-xl text-left flex flex-col justify-between ${p.estoque > 0 ? 'border-[#E0DDDD] bg-white hover:bg-[#f9f1f0]' : 'border-zinc-200 opacity-50 bg-zinc-100 cursor-not-allowed'}`}>
+                <button key={p.id} onClick={() => adicionarAoCarrinho(p)} disabled={p.estoque <= 0} className={`p-3 border-2 rounded-xl text-left transition-all flex flex-col justify-between ${p.estoque > 0 ? 'border-[#E0DDDD] hover:border-[#6A283A] bg-white hover:bg-[#f9f1f0] active:scale-95 shadow-sm' : 'border-zinc-200 opacity-50 bg-zinc-100 cursor-not-allowed'}`}>
                   <div>
-                    <h3 className="font-bold text-zinc-800 text-xs leading-tight line-clamp-2 h-8">{p.nome}</h3>
-                    <p className="text-[10px] font-semibold text-zinc-500 mt-1">Estoque: {p.estoque}</p>
+                    <h3 className="font-bold text-zinc-900 text-xs md:text-sm leading-tight line-clamp-2 h-8">{p.nome}</h3>
+                    {p.marca && <p className="text-[9px] md:text-[10px] font-black text-purple-600 uppercase mt-0.5 line-clamp-1">{p.marca}</p>}
+                    <p className="text-[10px] md:text-xs font-semibold text-zinc-500 mt-1">Estoque: {p.estoque}</p>
                   </div>
-                  <p className="text-sm font-black text-[#6A283A] mt-1.5 border-t border-zinc-100 pt-1 w-full">{formataMoeda(p.precoVenda)}</p>
+                  <p className="text-sm md:text-base font-black text-[#6A283A] mt-1.5 border-t border-zinc-100 pt-1 w-full">{formataMoeda(p.precoVenda)}</p>
                 </button>
               ))}
+              {produtosFiltrados.length === 0 && (
+                <div className="col-span-full p-8 text-center text-zinc-400 font-medium text-sm flex flex-col items-center">
+                  <span className="text-3xl mb-2">🤔</span>
+                  Nenhum produto encontrado.
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="w-full lg:w-[380px] xl:w-[420px] flex-shrink-0 bg-zinc-50 flex flex-col rounded-xl border border-[#E0DDDD] min-h-0 overflow-hidden">
-          <div className="flex-shrink-0 bg-[#6A283A] text-white p-3 flex justify-between items-center">
-            <h2 className="text-sm font-black uppercase">🛒 Cupom Fiscal</h2>
+        {/* 🚀 CARRINHO LIVRE PARA CRESCER NO MOBILE */}
+        <div className="w-full lg:w-[380px] xl:w-[420px] bg-zinc-50 flex flex-col rounded-xl shadow-xl lg:shadow-none border border-[#E0DDDD] lg:flex-shrink-0 lg:min-h-0 lg:overflow-hidden mb-6 lg:mb-0">
+          
+          <div className="flex-shrink-0 bg-[#6A283A] text-white p-3 flex justify-between items-center shadow-md rounded-t-xl">
+            <h2 className="text-sm font-black uppercase tracking-wider">🛒 Cupom Fiscal</h2>
             <span className="bg-white text-[#6A283A] font-black px-2 py-0.5 rounded text-xs">{carrinho.length} Itens</span>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-white min-h-[100px]">
+          {/* LISTA DE ITENS DO CARRINHO (Com altura máxima de segurança) */}
+          <div className="overflow-y-auto p-2 space-y-2 bg-white min-h-[120px] max-h-[25vh] lg:max-h-none lg:flex-1">
             {carrinho.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-zinc-400 p-4 text-center">
-                <span className="text-4xl">🛍️</span><p className="font-medium text-sm">O carrinho está vazio</p>
+              <div className="h-full flex flex-col items-center justify-center text-zinc-400 p-4 text-center py-8">
+                <span className="text-4xl opacity-50 mb-2">🛍️</span>
+                <p className="font-medium text-sm">O carrinho está vazio</p>
               </div>
             ) : (
               carrinho.map((item) => (
-                <div key={item.id} className="flex justify-between items-center bg-white p-2 rounded-lg border border-zinc-200 shadow-sm">
+                <div key={item.id} className="flex justify-between items-center bg-white p-2.5 rounded-lg border border-zinc-200 shadow-sm">
                   <div className="flex-1 pr-2">
-                    <p className="font-bold text-zinc-800 text-xs leading-tight">{item.nome}</p>
-                    <p className="text-[11px] text-zinc-500 mt-0.5"><strong>{item.quantidade}x</strong> {formataMoeda(item.precoVenda)}</p>
+                    <p className="font-bold text-zinc-800 text-xs md:text-sm leading-tight">{item.nome}</p>
+                    <p className="text-[11px] md:text-xs text-zinc-500 mt-0.5"><strong>{item.quantidade}x</strong> {formataMoeda(item.precoVenda)}</p>
                   </div>
                   <div className="flex items-center gap-3 pl-2 border-l border-zinc-100">
                     <span className="font-black text-[#6A283A] text-sm whitespace-nowrap">{formataMoeda(item.quantidade * item.precoVenda)}</span>
-                    <button onClick={() => removerDoCarrinho(item.id)} className="text-red-500 font-bold text-sm">✖</button>
+                    <button onClick={() => removerDoCarrinho(item.id)} className="text-red-500 bg-red-50 hover:bg-red-100 w-8 h-8 rounded-md flex items-center justify-center font-bold text-lg transition-colors">✖</button>
                   </div>
                 </div>
               ))
             )}
           </div>
 
-          <div className="flex-shrink-0 bg-white border-t-2 border-zinc-200 p-3 shadow-lg">
-            <div className="grid grid-cols-2 gap-2 mb-2">
+          {/* 🚀 FORMULÁRIO DE PAGAMENTO (Botões maiores no mobile) */}
+          <div className="flex-shrink-0 bg-white border-t-2 border-zinc-200 p-4 lg:p-3 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] rounded-b-xl">
+            
+            <div className="grid grid-cols-2 gap-3 lg:gap-2 mb-3 lg:mb-2">
               <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase mb-0.5 block">🏷️ Desconto (R$)</label>
-                <input type="number" step="0.01" value={desconto} onChange={(e) => setDesconto(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))} placeholder="0.00" className="w-full p-2 rounded bg-zinc-50 font-bold border border-zinc-300 text-xs" />
+                <label className="text-[11px] lg:text-[10px] font-bold text-zinc-500 uppercase mb-1 lg:mb-0.5 block">🏷️ Desconto (R$)</label>
+                <input 
+                  type="number" step="0.01" value={desconto} 
+                  onChange={(e) => setDesconto(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))} 
+                  placeholder="0.00" 
+                  className="w-full p-3 lg:p-2 rounded bg-zinc-50 font-bold border border-zinc-300 outline-none text-zinc-800 text-sm lg:text-xs shadow-inner" 
+                />
               </div>
               <div>
-                <div className="flex justify-between items-end mb-0.5">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase block">Vincular Cliente</label>
-                  <button type="button" onClick={() => setModalCliente(true)} className="text-[9px] font-black text-[#6A283A] bg-[#EED9D4]/50 px-1.5 py-0.5 rounded">➕ NOVO</button>
+                <div className="flex justify-between items-end mb-1 lg:mb-0.5">
+                  <label className="text-[11px] lg:text-[10px] font-bold text-zinc-500 uppercase block">Vincular Cliente</label>
+                  <button type="button" onClick={() => setModalCliente(true)} className="text-[9px] font-black text-white bg-[#6A283A] px-2 py-1 lg:px-1.5 lg:py-0.5 rounded uppercase shadow-sm">➕ Novo</button>
                 </div>
-                <select value={clienteSelecionado} onChange={(e) => setClienteSelecionado(e.target.value)} className="w-full p-2 rounded bg-zinc-50 font-bold border border-zinc-300 text-xs">
+                <select value={clienteSelecionado} onChange={(e) => setClienteSelecionado(e.target.value)} className="w-full p-3 lg:p-2 rounded bg-zinc-50 font-bold border border-zinc-300 outline-none text-zinc-800 text-sm lg:text-xs">
                   <option value="">👤 Consumidor Final</option>
                   {clientesDB.map(c => <option key={c.id} value={c.id}>{c.nome.substring(0, 15)}</option>)}
                 </select>
               </div>
             </div>
 
-            <div className="mb-2">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase mb-0.5 block">Forma de Pagamento</label>
-              <select value={pagamento} onChange={(e) => { setPagamento(e.target.value); setValorRecebido(''); }} className="w-full p-2 rounded bg-zinc-50 font-bold border border-zinc-300 text-xs">
+            <div className="mb-3 lg:mb-2">
+              <label className="text-[11px] lg:text-[10px] font-bold text-zinc-500 uppercase mb-1 lg:mb-0.5 block">Forma de Pagamento</label>
+              <select value={pagamento} onChange={(e) => { setPagamento(e.target.value); setValorRecebido(''); }} className="w-full p-3 lg:p-2 rounded bg-zinc-50 font-bold border border-zinc-300 outline-none text-zinc-800 text-sm lg:text-xs focus:ring-2 focus:ring-[#6A283A]">
                 <option value="dinheiro">💵 Dinheiro</option>
                 <option value="pix">💠 PIX</option>
                 <option value="credito">💳 Cartão de Crédito</option>
                 <option value="debito">💳 Cartão de Débito</option>
                 <option value="venda_direta">📝 Venda Direta (Parcelado)</option>
-                <option value="multiplo">🔀 Múltiplas Formas</option>
+                <option value="multiplo">🔀 Múltiplas Formas (Dividir)</option>
               </select>
             </div>
 
             {pagamento === 'venda_direta' && (
-              <div className="mb-2">
-                <input type="text" value={observacaoDireta} onChange={(e) => setObservacaoDireta(e.target.value)} placeholder="Ex: Combinado 3x de R$ 50" className="w-full p-2 rounded bg-purple-50 text-purple-900 border border-purple-200 font-bold text-xs outline-none" />
+              <div className="mb-3 lg:mb-2 animate-in fade-in duration-200">
+                <label className="text-[11px] lg:text-[10px] font-bold text-purple-700 uppercase mb-1 lg:mb-0.5 block">📝 Nota / Parcelas (Oculto no cupom)</label>
+                <input type="text" value={observacaoDireta} onChange={(e) => setObservacaoDireta(e.target.value)} placeholder="Ex: Combinado 3x de R$ 50 no dia 10" className="w-full p-3 lg:p-2 rounded bg-purple-50 text-purple-900 border-2 border-purple-200 font-bold text-sm lg:text-xs outline-none focus:border-purple-500" />
               </div>
             )}
 
             {pagamento === 'dinheiro' && (
-              <div className="grid grid-cols-2 gap-2 mb-2 items-end">
-                <input type="number" step="0.01" value={valorRecebido} placeholder="Recebido (R$)" onChange={(e) => setValorRecebido(e.target.value ? Number(e.target.value) : '')} className="w-full p-2 rounded bg-white border border-[#6A283A] text-[#6A283A] font-black text-sm" />
+              <div className="grid grid-cols-2 gap-3 lg:gap-2 mb-3 lg:mb-2 animate-in fade-in duration-200 items-end">
+                <div>
+                  <label className="text-[11px] lg:text-[10px] font-bold text-zinc-500 uppercase mb-1 lg:mb-0.5 block">Recebido (R$)</label>
+                  <input type="number" step="0.01" value={valorRecebido} placeholder="Ex: 100" onChange={(e) => setValorRecebido(e.target.value ? Number(e.target.value) : '')} className="w-full p-3 lg:p-2 rounded bg-white border-2 border-[#6A283A]/40 text-[#6A283A] font-black text-base lg:text-sm outline-none" />
+                </div>
                 {Number(valorRecebido) >= totalComDesconto && totalComDesconto > 0 && (
-                  <div className="h-[36px] px-2 bg-green-100 rounded flex justify-between items-center text-xs font-bold text-green-700">
-                    <span>Troco: {formataMoeda(Number(valorRecebido) - totalComDesconto)}</span>
+                  <div className="h-[44px] lg:h-[36px] px-3 lg:px-2 bg-green-100 border border-green-400 rounded-lg flex justify-between items-center shadow-inner">
+                    <span className="text-[10px] lg:text-[10px] text-green-800 uppercase font-black">Troco:</span>
+                    <span className="text-base lg:text-sm font-black text-green-700">{formataMoeda(Number(valorRecebido) - totalComDesconto)}</span>
                   </div>
                 )}
               </div>
             )}
 
             {pagamento === 'multiplo' && (
-              <div className="bg-zinc-50 p-2 rounded-lg border border-zinc-200 mb-2 grid grid-cols-2 gap-2 text-xs font-bold">
-                <input type="number" step="0.01" value={valoresMultiplos.dinheiro} onChange={(e) => setValoresMultiplos({...valoresMultiplos, dinheiro: e.target.value})} className="w-full p-1.5 rounded border" placeholder="💵 Dinheiro" />
-                <input type="number" step="0.01" value={valoresMultiplos.pix} onChange={(e) => setValoresMultiplos({...valoresMultiplos, pix: e.target.value})} className="w-full p-1.5 rounded border" placeholder="💠 PIX" />
-                <input type="number" step="0.01" value={valoresMultiplos.credito} onChange={(e) => setValoresMultiplos({...valoresMultiplos, credito: e.target.value})} className="w-full p-1.5 rounded border" placeholder="💳 Crédito" />
-                <input type="number" step="0.01" value={valoresMultiplos.debito} onChange={(e) => setValoresMultiplos({...valoresMultiplos, debito: e.target.value})} className="w-full p-1.5 rounded border" placeholder="💳 Débito" />
-                <input type="text" value={observacaoMultipla} onChange={(e) => setObservacaoMultipla(e.target.value)} className="col-span-2 p-1.5 rounded border outline-none" placeholder="Observações da divisão..." />
+              <div className="bg-zinc-50 p-3 lg:p-2 rounded-lg border border-zinc-200 mb-3 lg:mb-2 grid grid-cols-2 gap-3 lg:gap-2 animate-in slide-in-from-top-1 duration-200">
+                <div>
+                  <label className="text-[10px] lg:text-[9px] font-black text-zinc-600 block mb-1">💵 Dinheiro</label>
+                  <input type="number" step="0.01" value={valoresMultiplos.dinheiro} onChange={(e) => setValoresMultiplos({...valoresMultiplos, dinheiro: e.target.value})} className="w-full p-2 lg:p-1.5 rounded border border-zinc-300 font-bold text-sm lg:text-xs" placeholder="0.00" />
+                </div>
+                <div>
+                  <label className="text-[10px] lg:text-[9px] font-black text-zinc-600 block mb-1">💠 PIX</label>
+                  <input type="number" step="0.01" value={valoresMultiplos.pix} onChange={(e) => setValoresMultiplos({...valoresMultiplos, pix: e.target.value})} className="w-full p-2 lg:p-1.5 rounded border border-zinc-300 font-bold text-sm lg:text-xs" placeholder="0.00" />
+                </div>
+                <div>
+                  <label className="text-[10px] lg:text-[9px] font-black text-zinc-600 block mb-1">💳 Crédito</label>
+                  <input type="number" step="0.01" value={valoresMultiplos.credito} onChange={(e) => setValoresMultiplos({...valoresMultiplos, credito: e.target.value})} className="w-full p-2 lg:p-1.5 rounded border border-zinc-300 font-bold text-sm lg:text-xs" placeholder="0.00" />
+                </div>
+                <div>
+                  <label className="text-[10px] lg:text-[9px] font-black text-zinc-600 block mb-1">💳 Débito</label>
+                  <input type="number" step="0.01" value={valoresMultiplos.debito} onChange={(e) => setValoresMultiplos({...valoresMultiplos, debito: e.target.value})} className="w-full p-2 lg:p-1.5 rounded border border-zinc-300 font-bold text-sm lg:text-xs" placeholder="0.00" />
+                </div>
+                
+                <div className="col-span-2">
+                  <label className="text-[10px] lg:text-[9px] font-black text-zinc-600 block mb-1">📝 Observação da Divisão</label>
+                  <input type="text" value={observacaoMultipla} onChange={(e) => setObservacaoMultipla(e.target.value)} className="w-full p-2 lg:p-1.5 rounded border border-zinc-300 font-bold text-sm lg:text-xs bg-white focus:border-[#6A283A] outline-none" placeholder="Ex: Cartão da mãe, PIX da tia..." />
+                </div>
+
+                <div className="col-span-2 pt-2 lg:pt-1 border-t border-zinc-200 flex justify-between items-center text-xs lg:text-[10px]">
+                  <span className="font-bold text-zinc-500">
+                    Falta: <strong className={faltaPagarMultiplo > 0 ? "text-red-600" : "text-green-600"}>{formataMoeda(Math.max(0, faltaPagarMultiplo))}</strong>
+                  </span>
+                  {trocoMultiplo > 0 && (
+                    <span className="bg-green-100 text-green-700 px-2 py-1 rounded font-black">Troco: {formataMoeda(trocoMultiplo)}</span>
+                  )}
+                </div>
               </div>
             )}
 
-            <div className="flex items-stretch gap-2 mt-1">
-              <div className="flex-[1.4] bg-zinc-100 border border-zinc-200 rounded-lg p-1.5 flex flex-col justify-center items-center">
-                <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest">A Pagar</span>
-                <span className="text-xl font-black text-[#6A283A]">{formataMoeda(totalComDesconto)}</span>
+            <div className="flex items-stretch gap-3 lg:gap-2 mt-2">
+              <div className="flex-[1.4] bg-zinc-100 border border-zinc-200 rounded-lg p-2 lg:p-1.5 flex flex-col justify-center items-center">
+                <span className="text-[10px] lg:text-[9px] text-zinc-500 font-bold uppercase tracking-widest mb-0.5">A Pagar</span>
+                <span className="text-2xl lg:text-xl font-black text-[#6A283A] leading-none">{formataMoeda(totalComDesconto)}</span>
+                {Number(desconto) > 0 && <span className="text-[10px] lg:text-[9px] text-zinc-400 line-through mt-1 lg:mt-0.5">{formataMoeda(totalCompra)}</span>}
               </div>
-              <button onClick={handleFinalizarVenda} disabled={botaoDesabilitado || processandoVenda} className="flex-[2] bg-[#6A283A] text-white font-black rounded-lg disabled:opacity-50 uppercase text-sm">
+
+              {/* BOTÃO FINALIZAR GIGANTE NO MOBILE */}
+              <button 
+                onClick={handleFinalizarVenda} 
+                disabled={botaoDesabilitado || processandoVenda} 
+                className="flex-[2] bg-[#6A283A] text-white font-black rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#521e2d] uppercase tracking-wider text-base lg:text-sm py-4 lg:py-0 flex items-center justify-center transition-all shadow-md active:scale-95"
+              >
                 {processandoVenda ? '⏳ Gravando...' : '✅ Finalizar'}
               </button>
             </div>
+
           </div>
+
         </div>
       </div>
     </div>
