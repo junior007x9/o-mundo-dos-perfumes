@@ -2,7 +2,8 @@
 'use server'
 
 import { db } from '@/db';
-import { vendas, produtos, clientes, itensVenda, logsSistema } from '@/db/schema';
+// 🚀 ADICIONADA A TABELA 'usuarios' PARA CRUZAR OS NOMES!
+import { vendas, produtos, clientes, itensVenda, logsSistema, usuarios } from '@/db/schema';
 import { desc, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { getUsuarioLogado } from '@/app/actions';
@@ -16,9 +17,16 @@ export async function getDadosDashboard() {
   const listaClientes = await db.select().from(clientes);
   const listaItens = await db.select().from(itensVenda);
 
+  // 🚀 CRUCIAL: Buscar a lista de utilizadores para o Dashboard saber quem é quem!
+  let listaUsuarios: any[] = [];
+  try {
+    listaUsuarios = await db.select().from(usuarios);
+  } catch (e) {
+    console.error("Erro ao carregar a lista de utilizadores:", e);
+  }
+
   let logs: any[] = [];
   if (isAdmin) {
-    // 🚀 Limite aumentado para buscar o histórico de auditoria e correções completas
     logs = await db.select().from(logsSistema).orderBy(desc(logsSistema.id)).limit(500);
   }
 
@@ -29,6 +37,7 @@ export async function getDadosDashboard() {
     listaProdutos, 
     listaClientes, 
     listaItens,
+    listaUsuarios, // 🚀 Agora enviamos a lista para o ecrã do Dashboard!
     logs,
     idVendedorLogado: usuario?.id || 0,
     cargoVendedor: usuario?.cargo || 'vendedor'
@@ -114,12 +123,10 @@ export async function atualizarNotaReceberAction(idVenda: number, novaNota: stri
   revalidatePath('/dashboard');
 }
 
-// 🚀 NOVA LÓGICA DE CORREÇÃO: Usa os logs do sistema como âncora de dados para não dar erro na Vercel
 export async function atualizarVendedorAction(idVenda: number, novoVendedor: string) {
   const usu = await getUsuarioLogado();
   const nomeUsuario = usu?.nome || 'Sistema';
 
-  // Grava a alteração definitiva na tabela de sistema para o front-end mapear
   await db.insert(logsSistema).values({
     descricao: `[CORRECAO_VENDEDOR] Cupom #${idVenda} => ${novoVendedor}`,
     data: new Date().toISOString(),

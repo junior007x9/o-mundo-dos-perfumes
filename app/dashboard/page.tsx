@@ -18,7 +18,7 @@ export default function DashboardPage() {
   const [abaAtiva, setAbaAtiva] = useState('geral');
   const [ocultarValores, setOcultarValores] = useState(false);
 
-  // Fallback rápido visual
+  // Fallback rápido visual para correções
   const [vendedoresManuais, setVendedoresManuais] = useState<Record<number, string>>({});
 
   const [metaLoja, setMetaLoja] = useState<number>(50000); 
@@ -56,17 +56,14 @@ export default function DashboardPage() {
     localStorage.setItem('privacidadeMundoPerfumes', String(novoStatus));
   };
 
-  // 🚀 DISPARA A AÇÃO PARA GRAVAR A CORREÇÃO NO BANCO DE DADOS
   const salvarVendedorManual = async (idVenda: number, atual: string) => {
     const nome = prompt(`Correção Definitiva de Venda Antiga:\n\nDigite o nome correto de quem fez esta venda (Ex: Izabel, carolina flores, Junior loka):`, atual);
     if (nome && nome.trim() !== "" && nome.trim() !== atual) {
       
-      // Salva no estado visual imediatamente
       const novos = { ...vendedoresManuais, [idVenda]: nome.trim() };
       setVendedoresManuais(novos);
       localStorage.setItem('vendedoresRetroativosMundoPerfumes', JSON.stringify(novos));
       
-      // Envia para o banco de dados na nuvem!
       await atualizarVendedorAction(idVenda, nome.trim());
       alert('✅ Vendedor atualizado com sucesso no banco de dados!');
       carregar(); 
@@ -157,13 +154,12 @@ export default function DashboardPage() {
   const exibirMoeda = (valor: number) => ocultarValores ? 'R$ •••••' : formataMoeda(valor);
 
   // =========================================================================================
-  // 🚀 LÓGICA INFALÍVEL DE RESGATE DE VENDEDORES (Blindada para TypeScript)
+  // 🚀 LÓGICA INFALÍVEL DE RESGATE DE VENDEDORES (Agora com a lista do Banco de Dados)
   // =========================================================================================
   const vendedorMapLogs = new Map<number, string>();
   const correcoesManuaisLogs = new Map<number, string>();
 
   (logs || []).forEach((log: any) => {
-    // 1. Rastreador de Correção Manual no Banco de Dados
     if (log.descricao?.startsWith('[CORRECAO_VENDEDOR]')) {
        const match = log.descricao.match(/Cupom #(\d+) => (.+)/);
        if (match) {
@@ -175,7 +171,6 @@ export default function DashboardPage() {
        }
     }
 
-    // 2. Rastreador de Venda Orgânica
     const matchCupom = log.descricao?.match(/Cupom\s*#(\d+)/i);
     if (matchCupom && log.usuarioNome && !['Sistema', 'Caixa/PDV'].includes(log.usuarioNome) && !log.descricao.startsWith('[CORRECAO_VENDEDOR]')) {
       if (!vendedorMapLogs.has(Number(matchCupom[1]))) {
@@ -184,7 +179,6 @@ export default function DashboardPage() {
     }
   });
 
-  // 🚀 Função agora garante retornar estritamente UMA STRING (Evita erro da Vercel)
   const getNomeExibicaoVendedor = (venda: any): string => {
     // 1ª Prioridade: A correção oficial cravada na nuvem
     if (correcoesManuaisLogs.has(venda.id)) return String(correcoesManuaisLogs.get(venda.id));
@@ -192,16 +186,21 @@ export default function DashboardPage() {
     // 2ª Prioridade: A correção visual feita no celular antes do reload
     if (vendedoresManuais[venda.id]) return String(vendedoresManuais[venda.id]);
     
-    // 3ª Prioridade: A identidade enviada pelo banco nas vendas novas
+    // 3ª Prioridade: 🚀 AQUI ACONTECE A MÁGICA! O banco agora envia a lista de utilizadores
     if (venda.idVendedor && dados?.listaUsuarios) {
       const u = dados.listaUsuarios.find((x: any) => Number(x.id) === Number(venda.idVendedor));
       if (u && u.nome) return String(u.nome);
     }
     
-    // 4ª Prioridade: O nome que ficou gravado nos logs automáticos do passado
+    // 4ª Prioridade: Se a venda tiver um nome já gravado diferente do padrão
+    if (venda.vendedorNome && venda.vendedorNome !== 'Caixa/PDV' && venda.vendedorNome !== 'Caixa / PDV' && venda.vendedorNome !== 'Caixa / Balcão') {
+       return String(venda.vendedorNome);
+    }
+
+    // 5ª Prioridade: O nome que ficou gravado nos logs automáticos do passado
     if (vendedorMapLogs.has(venda.id)) return String(vendedorMapLogs.get(venda.id));
     
-    // 5ª Prioridade: Fallback final garantido
+    // Fallback final garantido
     return 'Caixa / PDV';
   };
   // =========================================================================================
@@ -410,7 +409,8 @@ export default function DashboardPage() {
   }).sort((a: any, b: any) => b.totalGasto - a.totalGasto); 
 
   const historicoAuditoria: any[] = [];
-  
+  const idsVendasNosLogs = new Set<number>();
+
   logs.filter((log: any) => log.categoria === 'produto' || log.categoria === 'venda').forEach((log: any) => {
     let textoDescricao = log.descricao;
     const descLower = textoDescricao.toLowerCase();
@@ -420,6 +420,8 @@ export default function DashboardPage() {
     const match = textoDescricao.match(/Cupom #(\d+)/i);
     if (match) {
       const vendaId = Number(match[1]);
+      idsVendasNosLogs.add(vendaId);
+      
       const vendaRelacionada = listaVendas.find((v: any) => v.id === vendaId);
       if (vendaRelacionada && !textoDescricao.includes('via') && !textoDescricao.startsWith('[CORRECAO')) {
         const pag = formatarPagamentoTabela(vendaRelacionada.formaPagamento);
@@ -449,7 +451,7 @@ export default function DashboardPage() {
   });
 
   listaVendas.forEach((v: any) => {
-    if (!vendedorMapLogs.has(v.id) && !correcoesManuaisLogs.has(v.id) && !v.idVendedor) {
+    if (!idsVendasNosLogs.has(v.id)) {
       const pag = formatarPagamentoTabela(v.formaPagamento);
       const vendedorRetroativo = getNomeExibicaoVendedor(v);
       
@@ -602,10 +604,11 @@ export default function DashboardPage() {
                       <td className={`p-3 text-sm font-black ${venda.status === 'cancelada' ? 'text-zinc-400 line-through' : 'text-green-600'}`}>{exibirMoeda(venda.total)}</td>
                       <td className="p-3 text-xs font-bold text-zinc-500 uppercase">{formatarPagamentoTabela(venda.formaPagamento)}</td>
                       
+                      {/* 🚀 BOTÃO DE CORREÇÃO MANUAL DO VENDEDOR (Agora grava na nuvem sem erros) */}
                       <td 
                         className="p-3 text-xs font-bold text-zinc-600 truncate max-w-[120px] cursor-pointer hover:text-blue-600 group" 
                         title="Clique para corrigir o nome do vendedor desta venda"
-                        onClick={() => isAdmin && salvarVendedorManual(venda.id, String(getNomeExibicaoVendedor(venda)))}
+                        onClick={() => isAdmin && salvarVendedorManual(venda.id, getNomeExibicaoVendedor(venda))}
                       >
                         <span className="flex items-center gap-1">
                           👤 {getNomeExibicaoVendedor(venda)}
