@@ -15,13 +15,9 @@ export default function DashboardPage() {
   const [usuarioNome, setUsuarioNome] = useState('');
   const [logs, setLogs] = useState<any[]>([]);
 
-  // 🚀 Controle unificado de todas as abas estratégicas (Inicia no Resumo)
   const [abaAtiva, setAbaAtiva] = useState('geral');
-
-  // Modo Privacidade memorizado pelo navegador
   const [ocultarValores, setOcultarValores] = useState(false);
 
-  // Estados para as Comissões
   const [metaLoja, setMetaLoja] = useState<number>(50000); 
   const [taxaComissao, setTaxaComissao] = useState<number>(5);
 
@@ -77,7 +73,7 @@ export default function DashboardPage() {
     const novaNota = prompt("Atualize o histórico do pagamento (Ex: Pagou R$100, faltam 2x):", notaAtual);
     if (novaNota !== null) {
       await atualizarNotaReceberAction(idVenda, novaNota);
-      alert('Histórico updated!');
+      alert('Histórico atualizado!');
       carregar();
     }
   };
@@ -331,7 +327,6 @@ export default function DashboardPage() {
 
   const clientNameMapSecure = new Map<number, string>(listaClientes.map((c: any) => [Number(c.id), String(c.nome || 'Consumidor Fixo')]));
 
-  // 🚀 LÓGICA DO CRM: Histórico de Compras (LTV) corrigida!
   const crmClientes = listaClientes.map((cliente: any) => {
     const comprasDoCliente = vendasValidas.filter((v: any) => Number(v.idCliente) === Number(cliente.id));
     const totalGasto = comprasDoCliente.reduce((acc: number, v: any) => acc + Number(v.total || 0), 0);
@@ -343,6 +338,90 @@ export default function DashboardPage() {
     }
     return { ...cliente, totalGasto, qtdCompras: comprasDoCliente.length, dataUltimaCompra, diasSemComprar };
   }).sort((a: any, b: any) => b.totalGasto - a.totalGasto); 
+
+  // =========================================================================================
+  // 🚀 RECONSTRUÇÃO INFALÍVEL DA AUDITORIA DE ESTOQUE (Retroativa até o 1º dia do sistema)
+  // =========================================================================================
+  const historicoAuditoria: any[] = [];
+  const idsVendasNosLogs = new Set<number>();
+
+  // 1. Processar os logs do banco (Kits desmanchados, adições, etc.)
+  logs.filter((log: any) => log.categoria === 'produto' || log.categoria === 'venda').forEach((log: any) => {
+    let textoDescricao = log.descricao;
+    const descLower = textoDescricao.toLowerCase();
+    let tipoBadge = "📦 AJUSTE / OUTROS";
+    let corBadge = "bg-blue-50 text-blue-700 border-blue-200";
+
+    // Detecta se o log atual pertence a uma venda para enriquecer o texto com o tipo de pagamento
+    const match = textoDescricao.match(/Cupom #(\d+)/i);
+    if (match) {
+      const vendaId = Number(match[1]);
+      idsVendasNosLogs.add(vendaId);
+      
+      const vendaRelacionada = listaVendas.find((v: any) => v.id === vendaId);
+      if (vendaRelacionada && !textoDescricao.includes('via')) {
+        const pag = formatarPagamentoTabela(vendaRelacionada.formaPagamento);
+        textoDescricao = textoDescricao.replace('Venda finalizada', `Venda finalizada via ${pag}`);
+      }
+    }
+
+    if (descLower.includes('venda finalizada') || descLower.includes('reduzido')) {
+      tipoBadge = "📉 BAIXA (SAÍDA)";
+      corBadge = "bg-red-50 text-red-700 border-red-200";
+    } else if (descLower.includes('retornaram') || descLower.includes('adicionado') || descLower.includes('desmanchado')) {
+      tipoBadge = "📈 ENTRADA (RETORNO)";
+      corBadge = "bg-green-50 text-green-700 border-green-200";
+    }
+
+    historicoAuditoria.push({
+      id: `log-${log.id}`,
+      data: log.data,
+      badge: tipoBadge,
+      corBadge: corBadge,
+      descricao: textoDescricao,
+      autor: log.usuarioNome || 'Sistema'
+    });
+  });
+
+  // 2. Busca o passado: Vendas antigas de Maio/Junho que não têm registro na tabela de logs nova
+  listaVendas.forEach((v: any) => {
+    if (!idsVendasNosLogs.has(v.id)) {
+      const pag = formatarPagamentoTabela(v.formaPagamento);
+      
+      // Cruza com a tabela de Itens para saber exatamente o que saiu do estoque naquele dia
+      const itensVendaLocal = listaItens.filter((i: any) => i.idVenda === v.id);
+      const nomesItens = itensVendaLocal.map((i: any) => {
+        const prod = listaProdutos.find((p: any) => p.id === i.idProduto);
+        return `${i.quantidade}x ${prod ? prod.nome : 'Produto (Excluído)'}`;
+      }).join(', ');
+
+      historicoAuditoria.push({
+        id: `venda-retro-${v.id}`,
+        data: v.data,
+        badge: "📉 BAIXA (SAÍDA)",
+        corBadge: "bg-red-50 text-red-700 border-red-200",
+        descricao: `Venda finalizada via ${pag} (Cupom #${v.id}). Estoque reduzido. Itens: ${nomesItens || 'Registos antigos'}`,
+        autor: v.vendedorNome || 'Caixa/PDV'
+      });
+
+      // Se a venda de Maio foi cancelada, gera o log de devolução da mercadoria para o estoque
+      if (v.status === 'cancelada') {
+        const dataCancelamento = new Date(new Date(v.data).getTime() + 1000).toISOString();
+        historicoAuditoria.push({
+          id: `venda-estorno-retro-${v.id}`,
+          data: dataCancelamento,
+          badge: "📈 ENTRADA (RETORNO)",
+          corBadge: "bg-green-50 text-green-700 border-green-200",
+          descricao: `Venda CANCELADA/ESTORNADA via ${pag} (Cupom #${v.id}). Os itens retornaram ao estoque. Itens: ${nomesItens || 'Registos antigos'}`,
+          autor: 'Admin / Sistema'
+        });
+      }
+    }
+  });
+
+  // 3. Ordena o Histórico Total (do mais recente para o mais antigo de todos)
+  historicoAuditoria.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+
 
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
@@ -363,7 +442,6 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      {/* MENU DE ABAS ATUALIZADO */}
       <div className="flex overflow-x-auto gap-2 border-b border-zinc-200 pb-px scrollbar-none">
         <button onClick={() => setAbaAtiva('geral')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'geral' ? 'border-[#6A283A] text-[#6A283A]' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>📊 Resumo</button>
         <button onClick={() => setAbaAtiva('receber')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'receber' ? 'border-purple-600 text-purple-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>📝 A Receber</button>
@@ -519,7 +597,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ==================== 🚀 ABA DE AUDITORIA DE ESTOQUE ==================== */}
+      {/* ==================== ABA DE AUDITORIA DE ESTOQUE ==================== */}
       {abaAtiva === 'auditoria' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300 space-y-4">
           <div className="flex flex-col md:flex-row justify-between md:items-center gap-2 border-b border-zinc-100 pb-4">
@@ -527,10 +605,10 @@ export default function DashboardPage() {
               <h2 className="text-xl font-black text-amber-600 flex items-center gap-2">
                 <span>🔍</span> Registro Oficial de Auditoria de Estoque
               </h2>
-              <p className="text-zinc-500 text-sm mt-0.5">Histórico imutável de entradas, saídas, baixas de PDV e reconstituição de mercadorias.</p>
+              <p className="text-zinc-500 text-sm mt-0.5">Histórico imutável completo desde o primeiro dia do sistema.</p>
             </div>
             <span className="bg-amber-100 text-amber-800 text-[11px] font-black px-3 py-1 rounded-md uppercase border border-amber-200">
-              Segurança Contra Desvios
+              Segurança Total
             </span>
           </div>
 
@@ -545,44 +623,28 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 font-semibold text-sm">
-                {logs
-                  .filter((log: any) => log.categoria === 'produto' || log.categoria === 'venda')
-                  .map((log: any) => {
-                    const descLower = log.descricao.toLowerCase();
-                    let badgeEstoque = "📦 AJUSTE";
-                    let corBadge = "bg-blue-50 text-blue-700 border-blue-200";
-
-                    if (descLower.includes('venda finalizada') || descLower.includes('reduzido')) {
-                      badgeEstoque = "📉 BAIXA (SAÍDA)";
-                      corBadge = "bg-red-50 text-red-700 border-red-200";
-                    } else if (descLower.includes('retornaram') || descLower.includes('adicionado') || descLower.includes('desmanchado')) {
-                      badgeEstoque = "📈 ENTRADA (RETORNO)";
-                      corBadge = "bg-green-50 text-green-700 border-green-200";
-                    }
-
-                    return (
-                      <tr key={log.id} className="hover:bg-zinc-50/60 transition-colors">
-                        <td className="p-3 text-zinc-500 font-mono text-xs">
-                          {new Date(log.data).toLocaleString('pt-BR')}
-                        </td>
-                        <td className="p-3">
-                          <span className={`px-2 py-1 rounded border text-[10px] font-black uppercase tracking-wide ${corBadge}`}>
-                            {badgeEstoque}
-                          </span>
-                        </td>
-                        <td className="p-3 text-zinc-700 font-bold max-w-md whitespace-normal break-words leading-relaxed">
-                          {log.descricao}
-                        </td>
-                        <td className="p-3 text-zinc-500 uppercase text-xs font-black">
-                          👤 {log.usuarioNome}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                {logs.filter((log: any) => log.categoria === 'produto' || log.categoria === 'venda').length === 0 && (
+                {historicoAuditoria.map((auditoria: any) => (
+                  <tr key={auditoria.id} className="hover:bg-zinc-50/60 transition-colors">
+                    <td className="p-3 text-zinc-500 font-mono text-xs">
+                      {new Date(auditoria.data).toLocaleString('pt-BR')}
+                    </td>
+                    <td className="p-3">
+                      <span className={`px-2 py-1 rounded border text-[10px] font-black uppercase tracking-wide ${auditoria.corBadge}`}>
+                        {auditoria.badge}
+                      </span>
+                    </td>
+                    <td className="p-3 text-zinc-700 font-bold max-w-md whitespace-normal break-words leading-relaxed">
+                      {auditoria.descricao}
+                    </td>
+                    <td className="p-3 text-zinc-500 uppercase text-xs font-black">
+                      👤 {auditoria.autor}
+                    </td>
+                  </tr>
+                ))}
+                {historicoAuditoria.length === 0 && (
                   <tr>
                     <td colSpan={4} className="p-8 text-center text-zinc-400 font-medium">
-                      Nenhuma movimentação física registrada no histórico de auditoria.
+                      Nenhuma movimentação física registrada.
                     </td>
                   </tr>
                 )}
