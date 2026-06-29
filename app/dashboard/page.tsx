@@ -15,10 +15,10 @@ export default function DashboardPage() {
   const [usuarioNome, setUsuarioNome] = useState('');
   const [logs, setLogs] = useState<any[]>([]);
 
-  // 🚀 Controle unificado de todas as abas estratégicas
+  // 🚀 Controle unificado de todas as abas estratégicas (Inicia no Resumo)
   const [abaAtiva, setAbaAtiva] = useState('geral');
 
-  // 🚀 MODO PRIVACIDADE (Ocultar dados sensíveis)
+  // Modo Privacidade memorizado pelo navegador
   const [ocultarValores, setOcultarValores] = useState(false);
 
   // Estados para as Comissões
@@ -27,6 +27,10 @@ export default function DashboardPage() {
 
   useEffect(() => {
     carregar();
+    const statusSalvo = localStorage.getItem('privacidadeMundoPerfumes');
+    if (statusSalvo === 'true') {
+      setOcultarValores(true);
+    }
   }, []);
 
   async function carregar() {
@@ -46,6 +50,12 @@ export default function DashboardPage() {
 
     setCarregando(false);
   }
+
+  const handleAlternarPrivacidade = () => {
+    const novoStatus = !ocultarValores;
+    setOcultarValores(novoStatus);
+    localStorage.setItem('privacidadeMundoPerfumes', String(novoStatus));
+  };
 
   const handleEstornarVenda = async (idVenda: number) => {
     if(confirm('ATENÇÃO: Deseja realmente cancelar esta venda?\n\nO valor será subtraído do faturamento e os produtos voltarão automaticamente para o estoque.')) {
@@ -67,7 +77,7 @@ export default function DashboardPage() {
     const novaNota = prompt("Atualize o histórico do pagamento (Ex: Pagou R$100, faltam 2x):", notaAtual);
     if (novaNota !== null) {
       await atualizarNotaReceberAction(idVenda, novaNota);
-      alert('Histórico atualizado!');
+      alert('Histórico updated!');
       carregar();
     }
   };
@@ -130,8 +140,6 @@ export default function DashboardPage() {
   };
 
   const formataMoeda = (valor: number) => valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  
-  // 🚀 FUNÇÃO DE MASCARAMENTO SE O MODO PRIVACIDADE ESTIVER ATIVO
   const exibirMoeda = (valor: number) => ocultarValores ? 'R$ •••••' : formataMoeda(valor);
 
   const exportarParaExcel = () => {
@@ -332,7 +340,7 @@ export default function DashboardPage() {
       const msDiff = new Date().getTime() - new Date(dataUltimaCompra).getTime();
       diasSemComprar = Math.floor(msDiff / (1000 * 60 * 60 * 24));
     }
-    return { ...cliente, totalGasto, qtdCompras: comprasDoCliente.length, dataUltimaCompra, diasSemComprar };
+    return { ...cliente, totalGasto, qtdCompras: comprasDoTemplate = comprasDoCliente.length, dataUltimaCompra, diasSemComprar };
   }).sort((a: any, b: any) => b.totalGasto - a.totalGasto); 
 
   return (
@@ -346,31 +354,31 @@ export default function DashboardPage() {
             <p className="text-zinc-600 text-sm mt-0.5 font-medium">Controle de carteira (CRM), P&L, comissões, fluxo de mercadoria e rotulagem em um só lugar.</p>
           </div>
         </div>
-        {/* 🚀 BOTÃO DE MODO PRIVACIDADE */}
         <button 
-          onClick={() => setOcultarValores(!ocultarValores)}
+          onClick={handleAlternarPrivacidade}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-black transition-all shadow-sm ${ocultarValores ? 'bg-zinc-800 text-white' : 'bg-white border border-[#E0DDDD] text-zinc-600 hover:bg-zinc-50'}`}
         >
           {ocultarValores ? '👁️ Mostrar Valores' : '🙈 Ocultar Valores'}
         </button>
       </div>
 
-      {/* MENU DE ABAS */}
+      {/* MENU DE ABAS ATUALIZADO */}
       <div className="flex overflow-x-auto gap-2 border-b border-zinc-200 pb-px scrollbar-none">
         <button onClick={() => setAbaAtiva('geral')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'geral' ? 'border-[#6A283A] text-[#6A283A]' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>📊 Resumo</button>
         <button onClick={() => setAbaAtiva('receber')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'receber' ? 'border-purple-600 text-purple-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>📝 A Receber</button>
         <button onClick={() => setAbaAtiva('crm')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'crm' ? 'border-pink-600 text-pink-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>🛍️ CRM (Clientes)</button>
+        {/* 🚀 NOVA ABA ADICIONADA: AUDITORIA DE MOVIMENTAÇÃO DE ESTOQUE */}
+        <button onClick={() => setAbaAtiva('auditoria')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'auditoria' ? 'border-amber-600 text-amber-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>🔍 Auditoria de Estoque</button>
         <button onClick={() => setAbaAtiva('dre')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'dre' ? 'border-blue-600 text-blue-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>🧮 DRE Gerencial</button>
         <button onClick={() => setAbaAtiva('giro')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'giro' ? 'border-orange-500 text-orange-500' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>📦 Giro / Compras</button>
         <button onClick={() => setAbaAtiva('comissoes')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'comissoes' ? 'border-amber-500 text-amber-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>🎖️ Comissões</button>
         <button onClick={() => setAbaAtiva('etiquetas')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'etiquetas' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>🏷️ Etiquetas</button>
       </div>
 
-      {/* ==================== ABA GERAL COM 5 CARDS ==================== */}
+      {/* ==================== ABA GERAL ==================== */}
       {abaAtiva === 'geral' && (
         <div className="space-y-6 animate-in fade-in duration-300">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-6">
-            
             <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-[#6A283A] flex flex-col justify-between">
               <div><h3 className="text-xs font-bold text-zinc-500 uppercase">Vendas de Hoje</h3><p className="text-2xl font-black text-[#6A283A] mt-2">{exibirMoeda(totalVendidoHoje)}</p></div>
               <div className="mt-4 pt-3 border-t border-zinc-100 grid grid-cols-2 gap-2 text-[10px] font-bold text-zinc-500 text-center">
@@ -426,7 +434,6 @@ export default function DashboardPage() {
               </div>
               <p className="text-xs text-zinc-400 mt-4 pt-2 border-t border-zinc-100">Capital Investido Atual: <strong>{exibirMoeda(capitalInvestidoEstoque)}</strong></p>
             </div>
-
           </div>
 
           <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD]">
@@ -437,7 +444,7 @@ export default function DashboardPage() {
                 <button onClick={exportarParaPDF} className="bg-[#6A283A] text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm">📄 PDF</button>
               </div>
             </div>
-            <div className="overflow-x-auto rounded-lg border border-[#E0DDDD]/60 flex-1 max-h-[400px]">
+            <div className="overflow-x-auto rounded-lg border border-[#E0DDDD]/60 flex-1 max-h-[400px] overflow-y-auto">
               <table className="w-full text-left whitespace-nowrap">
                 <thead className="bg-zinc-50 sticky top-0 border-b border-[#E0DDDD] z-10">
                   <tr>
@@ -450,16 +457,14 @@ export default function DashboardPage() {
                 </thead>
                 <tbody>
                   {listaVendas.map((venda: any) => (
-                    <tr key={venda.id} className={`border-b border-[#E0DDDD]/50 ${venda.status === 'cancelada' ? 'bg-red-50/50' : ''}`}>
+                    <tr key={venda.id} className={`border-b border-[#E0DDDD]/50 transition-colors ${venda.status === 'cancelada' ? 'bg-red-50/50' : ''}`}>
                       <td className="p-3 text-sm text-zinc-600">{new Date(venda.data).toLocaleString('pt-BR')}</td>
                       <td className={`p-3 text-sm font-black ${venda.status === 'cancelada' ? 'text-zinc-400 line-through' : 'text-green-600'}`}>{exibirMoeda(venda.total)}</td>
                       <td className="p-3 text-xs font-bold text-zinc-500 uppercase">{formatarPagamentoTabela(venda.formaPagamento)}</td>
                       <td className="p-3"><span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${venda.status === 'cancelada' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{venda.status === 'cancelada' ? 'Cancelada' : 'Concluída'}</span></td>
                       <td className="p-3 text-right">
                         {venda.status !== 'cancelada' && (
-                          <button onClick={() => handleEstornarVenda(venda.id)} className="text-xs bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded hover:bg-red-600 hover:text-white transition-colors font-bold shadow-sm">
-                            Estornar
-                          </button>
+                          <button onClick={() => handleEstornarVenda(venda.id)} className="text-xs bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded hover:bg-red-600 hover:text-white transition-colors font-bold shadow-sm">Estornar</button>
                         )}
                       </td>
                     </tr>
@@ -514,7 +519,81 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ==================== ABA CRM DE CLIENTES (FIDELIZAÇÃO) ==================== */}
+      {/* ==================== 🚀 NOVA ABA: AUDITORIA DE MOVIMENTAÇÃO DE ESTOQUE ==================== */}
+      {abaAtiva === 'auditoria' && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300 space-y-4">
+          <div className="flex flex-col md:flex-row justify-between md:items-center gap-2 border-b border-zinc-100 pb-4">
+            <div>
+              <h2 className="text-xl font-black text-amber-600 flex items-center gap-2">
+                <span>🔍</span> Registro Oficial de Auditoria de Estoque
+              </h2>
+              <p className="text-zinc-500 text-sm mt-0.5">Histórico imutável de entradas, saídas, baixas de PDV e reconstituição de mercadorias.</p>
+            </div>
+            <span className="bg-amber-100 text-amber-800 text-[11px] font-black px-3 py-1 rounded-md uppercase border border-amber-200">
+              Segurança Contra Desvios
+            </span>
+          </div>
+
+          <div className="overflow-x-auto rounded-lg border border-[#E0DDDD]">
+            <table className="w-full text-left whitespace-nowrap">
+              <thead className="bg-zinc-50 border-b border-[#E0DDDD]">
+                <tr>
+                  <th className="p-3 text-xs font-bold text-zinc-600 uppercase tracking-wider">Data / Hora</th>
+                  <th className="p-3 text-xs font-bold text-zinc-600 uppercase tracking-wider">Operação</th>
+                  <th className="p-3 text-xs font-bold text-zinc-600 uppercase tracking-wider">Descrição Detalhada do Fluxo</th>
+                  <th className="p-3 text-xs font-bold text-zinc-600 uppercase tracking-wider">Autor da Ação</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100 font-semibold text-sm">
+                {logs
+                  .filter((log: any) => log.categoria === 'produto' || log.categoria === 'venda')
+                  .map((log: any) => {
+                    const descLower = log.descricao.toLowerCase();
+                    // Identifica visualmente o tipo de movimentação para o cliente ter acessibilidade
+                    let badgeEstoque = "📦 AJUSTE";
+                    let corBadge = "bg-blue-50 text-blue-700 border-blue-200";
+
+                    if (descLower.includes('venda finalizada') || descLower.includes('reduzido')) {
+                      badgeEstoque = "📉 BAIXA (SAÍDA)";
+                      corBadge = "bg-red-50 text-red-700 border-red-200";
+                    } else if (descLower.includes('retornaram') || descLower.includes('adicionado') || descLower.includes('desmanchado')) {
+                      badgeEstoque = "📈 ENTRADA (RETORNO)";
+                      corBadge = "bg-green-50 text-green-700 border-green-200";
+                    }
+
+                    return (
+                      <tr key={log.id} className="hover:bg-zinc-50/60 transition-colors">
+                        <td className="p-3 text-zinc-500 font-mono text-xs">
+                          {new Date(log.data).toLocaleString('pt-BR')}
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded border text-[10px] font-black uppercase tracking-wide ${corBadge}`}>
+                            {badgeEstoque}
+                          </span>
+                        </td>
+                        <td className="p-3 text-zinc-700 font-bold max-w-md whitespace-normal break-words leading-relaxed">
+                          {log.descricao}
+                        </td>
+                        <td className="p-3 text-zinc-500 uppercase text-xs font-black">
+                          👤 {log.usuarioNome}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                {logs.filter((log: any) => log.categoria === 'produto' || log.categoria === 'venda').length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="p-8 text-center text-zinc-400 font-medium">
+                      Nenhuma movimentação física registrada no histórico de auditoria.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ABA CRM DE CLIENTES */}
       {abaAtiva === 'crm' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300">
           <div className="mb-6 flex flex-col md:flex-row justify-between md:items-end gap-4">
@@ -626,16 +705,6 @@ export default function DashboardPage() {
             <div className="flex justify-between items-end mb-2"><span className="text-sm font-bold text-zinc-600">Progresso da Meta Mensal</span><span className="font-black text-amber-600 text-lg">{Math.min((totalVendidoMes / metaLoja) * 100, 100).toFixed(1)}%</span></div>
             <div className="w-full bg-zinc-100 rounded-full h-4 overflow-hidden"><div className="bg-gradient-to-r from-amber-400 to-orange-500 h-4 rounded-full" style={{ width: `${Math.min((totalVendidoMes / metaLoja) * 100, 100)}%` }}></div></div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Object.entries(vendasMes.reduce((acc: any, v: any) => { const id = v.idVendedor ? String(v.idVendedor) : 'Loja Principal'; acc[id] = (acc[id] || 0) + Number(v.total || 0); return acc; }, {})).map(([idVendedor, total]: [string, any]) => (
-              <div key={idVendedor} className="border border-amber-200 bg-amber-50/30 rounded-xl p-5 hover:shadow-md relative overflow-hidden">
-                <div className="absolute top-0 right-0 bg-amber-200 text-amber-800 text-[10px] font-black px-3 py-1 rounded-bl-lg uppercase">ID: {idVendedor}</div>
-                <h3 className="font-black text-zinc-800 text-lg mb-4 mt-2">{idVendedor === 'Loja Principal' ? 'Sede / Balcão Fixo' : `Vendedor #${idVendedor}`}</h3>
-                <div className="flex justify-between items-center text-sm mb-2"><span className="text-zinc-500 font-bold">Vendido:</span><span className="font-black text-zinc-800">{exibirMoeda(Number(total))}</span></div>
-                <div className="flex justify-between items-center text-sm border-t border-amber-200 pt-2"><span className="text-amber-700 font-black uppercase">Comissão:</span><span className="font-black text-amber-600 text-xl">{exibirMoeda(Number(total) * (taxaComissao / 100))}</span></div>
-              </div>
-            ))}
-          </div>
         </div>
       )}
 
@@ -650,7 +719,6 @@ export default function DashboardPage() {
               <div key={p.id} className="p-4 border border-zinc-200 rounded-xl hover:border-emerald-500 transition-all bg-zinc-50 flex items-center justify-between gap-4">
                 <div className="truncate">
                   <p className="font-black text-sm text-zinc-800 truncate" title={p.nome}>{String(p.nome)}</p>
-                  {/* Etiqueta na tela NUNCA Oculta (apenas para ver o preço real a imprimir) */}
                   <p className="text-xs font-black text-emerald-600 mt-1">{formataMoeda(p.precoVenda)}</p>
                 </div>
                 <button onClick={() => dispararImpressaoEtiqueta(p)} className="bg-emerald-600 text-white text-xs font-black px-4 py-2.5 rounded-lg shadow-sm">🖨️ Imprimir</button>
