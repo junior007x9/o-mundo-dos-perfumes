@@ -18,7 +18,8 @@ export async function getDadosDashboard() {
 
   let logs: any[] = [];
   if (isAdmin) {
-    logs = await db.select().from(logsSistema).orderBy(desc(logsSistema.id)).limit(30);
+    // 🚀 Limite aumentado para buscar o histórico de auditoria e correções completas
+    logs = await db.select().from(logsSistema).orderBy(desc(logsSistema.id)).limit(500);
   }
 
   return { 
@@ -96,7 +97,6 @@ export async function atualizarNotaReceberAction(idVenda: number, novaNota: stri
 
   if (vendaAtual) {
     const formaSegura = String(vendaAtual.formaPagamento || '');
-    
     const formaLimpa = formaSegura.split(';obs=')[0].split(':obs=')[0];
     const prefixo = formaSegura.startsWith('venda_direta') ? 'venda_direta:obs=' : `${formaLimpa};obs=`;
     const novaForma = `${prefixo}${novaNota.replace(/[:;=]/g, ' ')}`;
@@ -114,25 +114,18 @@ export async function atualizarNotaReceberAction(idVenda: number, novaNota: stri
   revalidatePath('/dashboard');
 }
 
-// 🚀 NOVA FUNÇÃO: ATUALIZA O VENDEDOR DEFINITIVAMENTE NO BANCO DE DADOS
+// 🚀 NOVA LÓGICA DE CORREÇÃO: Usa os logs do sistema como âncora de dados para não dar erro na Vercel
 export async function atualizarVendedorAction(idVenda: number, novoVendedor: string) {
   const usu = await getUsuarioLogado();
   const nomeUsuario = usu?.nome || 'Sistema';
 
-  const resVenda = await db.select().from(vendas).where(eq(vendas.id, idVenda)).limit(1);
-  
-  if (resVenda.length > 0) {
-    await db.update(vendas)
-      .set({ vendedorNome: novoVendedor })
-      .where(eq(vendas.id, idVenda));
-
-    await db.insert(logsSistema).values({
-      descricao: `✏️ Vendedor da Venda #${idVenda} alterado no sistema para: "${novoVendedor}".`,
-      data: new Date().toISOString(),
-      categoria: 'venda',
-      usuarioNome: nomeUsuario
-    });
-  }
+  // Grava a alteração definitiva na tabela de sistema para o front-end mapear
+  await db.insert(logsSistema).values({
+    descricao: `[CORRECAO_VENDEDOR] Cupom #${idVenda} => ${novoVendedor}`,
+    data: new Date().toISOString(),
+    categoria: 'venda',
+    usuarioNome: nomeUsuario
+  });
 
   revalidatePath('/dashboard');
 }

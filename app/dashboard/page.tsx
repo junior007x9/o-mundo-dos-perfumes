@@ -18,6 +18,9 @@ export default function DashboardPage() {
   const [abaAtiva, setAbaAtiva] = useState('geral');
   const [ocultarValores, setOcultarValores] = useState(false);
 
+  // Fallback rápido visual
+  const [vendedoresManuais, setVendedoresManuais] = useState<Record<number, string>>({});
+
   const [metaLoja, setMetaLoja] = useState<number>(50000); 
   const [taxaComissao, setTaxaComissao] = useState<number>(5);
 
@@ -25,6 +28,9 @@ export default function DashboardPage() {
     carregar();
     const statusSalvo = localStorage.getItem('privacidadeMundoPerfumes');
     if (statusSalvo === 'true') setOcultarValores(true);
+
+    const vendedoresSalvos = localStorage.getItem('vendedoresRetroativosMundoPerfumes');
+    if (vendedoresSalvos) setVendedoresManuais(JSON.parse(vendedoresSalvos));
   }, []);
 
   async function carregar() {
@@ -50,13 +56,20 @@ export default function DashboardPage() {
     localStorage.setItem('privacidadeMundoPerfumes', String(novoStatus));
   };
 
-  // 🚀 FUNÇÃO PARA CORRIGIR O PASSADO DIRETAMENTE NO BANCO DE DADOS
+  // 🚀 DISPARA A AÇÃO PARA GRAVAR A CORREÇÃO NO BANCO DE DADOS
   const salvarVendedorManual = async (idVenda: number, atual: string) => {
     const nome = prompt(`Correção Definitiva de Venda Antiga:\n\nDigite o nome correto de quem fez esta venda (Ex: Izabel, carolina flores, Junior loka):`, atual);
     if (nome && nome.trim() !== "" && nome.trim() !== atual) {
+      
+      // Salva no estado visual imediatamente
+      const novos = { ...vendedoresManuais, [idVenda]: nome.trim() };
+      setVendedoresManuais(novos);
+      localStorage.setItem('vendedoresRetroativosMundoPerfumes', JSON.stringify(novos));
+      
+      // Envia para o banco de dados na nuvem!
       await atualizarVendedorAction(idVenda, nome.trim());
       alert('✅ Vendedor atualizado com sucesso no banco de dados!');
-      carregar(); // Recarrega os dados fresquinhos do banco
+      carregar(); 
     }
   };
 
@@ -105,7 +118,6 @@ export default function DashboardPage() {
     if (telefone && !telefone.startsWith('55') && telefone.length >= 10) {
       telefone = '55' + telefone;
     }
-    
     let texto = `*O MUNDO DOS PERFUMES* 🛍️\n\nOlá, *${nomeCliente}*, tudo bem?\n\n`;
     if (diasUltimaCompra > 60) {
       texto += `Faz um tempinho que você não nos visita! Chegaram várias novidades e fragrâncias incríveis na loja. Quer conferir o nosso catálogo novo com um desconto especial? ✨`;
@@ -144,33 +156,51 @@ export default function DashboardPage() {
   const exibirMoeda = (valor: number) => ocultarValores ? 'R$ •••••' : formataMoeda(valor);
 
   // =========================================================================================
-  // MAPEAMENTO INTELIGENTE DE USUÁRIOS/VENDEDORES
+  // 🚀 LÓGICA INFALÍVEL DE RESGATE DE VENDEDORES (Conectada com o banco de dados)
   // =========================================================================================
   const vendedorMapLogs = new Map<number, string>();
+  const correcoesManuaisLogs = new Map<number, string>();
+
   (logs || []).forEach((log: any) => {
+    // 1. Rastreador de Correção Manual no Banco de Dados
+    if (log.descricao?.startsWith('[CORRECAO_VENDEDOR]')) {
+       const match = log.descricao.match(/Cupom #(\d+) => (.+)/);
+       if (match) {
+          const vId = Number(match[1]);
+          const vNome = match[2].trim();
+          if (!correcoesManuaisLogs.has(vId)) {
+             correcoesManuaisLogs.set(vId, vNome);
+          }
+       }
+    }
+
+    // 2. Rastreador de Venda Orgânica
     const matchCupom = log.descricao?.match(/Cupom\s*#(\d+)/i);
-    if (matchCupom && log.usuarioNome && !['Sistema', 'Caixa/PDV'].includes(log.usuarioNome)) {
-      vendedorMapLogs.set(Number(matchCupom[1]), log.usuarioNome);
+    if (matchCupom && log.usuarioNome && !['Sistema', 'Caixa/PDV'].includes(log.usuarioNome) && !log.descricao.startsWith('[CORRECAO_VENDEDOR]')) {
+      if (!vendedorMapLogs.has(Number(matchCupom[1]))) {
+        vendedorMapLogs.set(Number(matchCupom[1]), log.usuarioNome);
+      }
     }
   });
 
   const getNomeExibicaoVendedor = (venda: any) => {
-    // 1. Se já existir um nome gravado no banco explicitamente (via correção manual nossa)
-    if (venda.vendedorNome && !['Caixa/PDV', 'Sistema', 'Caixa / Balcão'].includes(venda.vendedorNome)) {
-      return String(venda.vendedorNome);
-    }
+    // 1ª Prioridade: A correção oficial cravada na nuvem
+    if (correcoesManuaisLogs.has(venda.id)) return correcoesManuaisLogs.get(venda.id);
     
-    // 2. Tenta encontrar o usuário pelo ID se o backend enviar a lista (Vendas novas)
+    // 2ª Prioridade: A correção visual feita no celular antes do reload
+    if (vendedoresManuais[venda.id]) return vendedoresManuais[venda.id];
+    
+    // 3ª Prioridade: A identidade enviada pelo banco nas vendas novas
     if (venda.idVendedor && dados?.listaUsuarios) {
       const u = dados.listaUsuarios.find((x: any) => Number(x.id) === Number(venda.idVendedor));
       if (u && u.nome) return String(u.nome);
     }
     
-    // 3. Resgata dos logs da auditoria
+    // 4ª Prioridade: O nome que ficou gravado nos logs automáticos do passado
     if (vendedorMapLogs.has(venda.id)) return String(vendedorMapLogs.get(venda.id));
     
-    // 4. Fallback padrão se não tiver identificação
-    return 'Caixa/PDV';
+    // 5ª Prioridade: Fallback final
+    return 'Caixa / PDV';
   };
   // =========================================================================================
 
@@ -378,8 +408,7 @@ export default function DashboardPage() {
   }).sort((a: any, b: any) => b.totalGasto - a.totalGasto); 
 
   const historicoAuditoria: any[] = [];
-  const idsVendasNosLogs = new Set<number>();
-
+  
   logs.filter((log: any) => log.categoria === 'produto' || log.categoria === 'venda').forEach((log: any) => {
     let textoDescricao = log.descricao;
     const descLower = textoDescricao.toLowerCase();
@@ -389,10 +418,8 @@ export default function DashboardPage() {
     const match = textoDescricao.match(/Cupom #(\d+)/i);
     if (match) {
       const vendaId = Number(match[1]);
-      idsVendasNosLogs.add(vendaId);
-      
       const vendaRelacionada = listaVendas.find((v: any) => v.id === vendaId);
-      if (vendaRelacionada && !textoDescricao.includes('via')) {
+      if (vendaRelacionada && !textoDescricao.includes('via') && !textoDescricao.startsWith('[CORRECAO')) {
         const pag = formatarPagamentoTabela(vendaRelacionada.formaPagamento);
         textoDescricao = textoDescricao.replace('Venda finalizada', `Venda finalizada via ${pag}`);
       }
@@ -404,6 +431,9 @@ export default function DashboardPage() {
     } else if (descLower.includes('retornaram') || descLower.includes('adicionado') || descLower.includes('desmanchado')) {
       tipoBadge = "📈 ENTRADA (RETORNO)";
       corBadge = "bg-green-50 text-green-700 border-green-200";
+    } else if (descLower.startsWith('[correcao_vendedor]')) {
+      tipoBadge = "✏️ AUDITORIA";
+      corBadge = "bg-amber-50 text-amber-700 border-amber-200";
     }
 
     historicoAuditoria.push({
@@ -417,7 +447,7 @@ export default function DashboardPage() {
   });
 
   listaVendas.forEach((v: any) => {
-    if (!idsVendasNosLogs.has(v.id)) {
+    if (!vendedorMapLogs.has(v.id) && !correcoesManuaisLogs.has(v.id) && !v.idVendedor) {
       const pag = formatarPagamentoTabela(v.formaPagamento);
       const vendedorRetroativo = getNomeExibicaoVendedor(v);
       
@@ -570,7 +600,6 @@ export default function DashboardPage() {
                       <td className={`p-3 text-sm font-black ${venda.status === 'cancelada' ? 'text-zinc-400 line-through' : 'text-green-600'}`}>{exibirMoeda(venda.total)}</td>
                       <td className="p-3 text-xs font-bold text-zinc-500 uppercase">{formatarPagamentoTabela(venda.formaPagamento)}</td>
                       
-                      {/* 🚀 BOTÃO DE CORREÇÃO MANUAL DO VENDEDOR (Agora grava na nuvem) */}
                       <td 
                         className="p-3 text-xs font-bold text-zinc-600 truncate max-w-[120px] cursor-pointer hover:text-blue-600 group" 
                         title="Clique para corrigir o nome do vendedor desta venda"
