@@ -331,6 +331,7 @@ export default function DashboardPage() {
 
   const clientNameMapSecure = new Map<number, string>(listaClientes.map((c: any) => [Number(c.id), String(c.nome || 'Consumidor Fixo')]));
 
+  // 🚀 LÓGICA DO CRM: Histórico de Compras (LTV) corrigida!
   const crmClientes = listaClientes.map((cliente: any) => {
     const comprasDoCliente = vendasValidas.filter((v: any) => Number(v.idCliente) === Number(cliente.id));
     const totalGasto = comprasDoCliente.reduce((acc: number, v: any) => acc + Number(v.total || 0), 0);
@@ -340,7 +341,7 @@ export default function DashboardPage() {
       const msDiff = new Date().getTime() - new Date(dataUltimaCompra).getTime();
       diasSemComprar = Math.floor(msDiff / (1000 * 60 * 60 * 24));
     }
-    return { ...cliente, totalGasto, qtdCompras: comprasDoTemplate = comprasDoCliente.length, dataUltimaCompra, diasSemComprar };
+    return { ...cliente, totalGasto, qtdCompras: comprasDoCliente.length, dataUltimaCompra, diasSemComprar };
   }).sort((a: any, b: any) => b.totalGasto - a.totalGasto); 
 
   return (
@@ -367,7 +368,6 @@ export default function DashboardPage() {
         <button onClick={() => setAbaAtiva('geral')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'geral' ? 'border-[#6A283A] text-[#6A283A]' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>📊 Resumo</button>
         <button onClick={() => setAbaAtiva('receber')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'receber' ? 'border-purple-600 text-purple-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>📝 A Receber</button>
         <button onClick={() => setAbaAtiva('crm')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'crm' ? 'border-pink-600 text-pink-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>🛍️ CRM (Clientes)</button>
-        {/* 🚀 NOVA ABA ADICIONADA: AUDITORIA DE MOVIMENTAÇÃO DE ESTOQUE */}
         <button onClick={() => setAbaAtiva('auditoria')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'auditoria' ? 'border-amber-600 text-amber-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>🔍 Auditoria de Estoque</button>
         <button onClick={() => setAbaAtiva('dre')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'dre' ? 'border-blue-600 text-blue-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>🧮 DRE Gerencial</button>
         <button onClick={() => setAbaAtiva('giro')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'giro' ? 'border-orange-500 text-orange-500' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>📦 Giro / Compras</button>
@@ -519,7 +519,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ==================== 🚀 NOVA ABA: AUDITORIA DE MOVIMENTAÇÃO DE ESTOQUE ==================== */}
+      {/* ==================== 🚀 ABA DE AUDITORIA DE ESTOQUE ==================== */}
       {abaAtiva === 'auditoria' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300 space-y-4">
           <div className="flex flex-col md:flex-row justify-between md:items-center gap-2 border-b border-zinc-100 pb-4">
@@ -549,7 +549,6 @@ export default function DashboardPage() {
                   .filter((log: any) => log.categoria === 'produto' || log.categoria === 'venda')
                   .map((log: any) => {
                     const descLower = log.descricao.toLowerCase();
-                    // Identifica visualmente o tipo de movimentação para o cliente ter acessibilidade
                     let badgeEstoque = "📦 AJUSTE";
                     let corBadge = "bg-blue-50 text-blue-700 border-blue-200";
 
@@ -704,6 +703,16 @@ export default function DashboardPage() {
           <div className="mb-8">
             <div className="flex justify-between items-end mb-2"><span className="text-sm font-bold text-zinc-600">Progresso da Meta Mensal</span><span className="font-black text-amber-600 text-lg">{Math.min((totalVendidoMes / metaLoja) * 100, 100).toFixed(1)}%</span></div>
             <div className="w-full bg-zinc-100 rounded-full h-4 overflow-hidden"><div className="bg-gradient-to-r from-amber-400 to-orange-500 h-4 rounded-full" style={{ width: `${Math.min((totalVendidoMes / metaLoja) * 100, 100)}%` }}></div></div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Object.entries(vendasMes.reduce((acc: any, v: any) => { const id = v.idVendedor ? String(v.idVendedor) : 'Loja Principal'; acc[id] = (acc[id] || 0) + Number(v.total || 0); return acc; }, {})).map(([idVendedor, total]: [string, any]) => (
+              <div key={idVendedor} className="border border-amber-200 bg-amber-50/30 rounded-xl p-5 hover:shadow-md relative overflow-hidden">
+                <div className="absolute top-0 right-0 bg-amber-200 text-amber-800 text-[10px] font-black px-3 py-1 rounded-bl-lg uppercase">ID: {idVendedor}</div>
+                <h3 className="font-black text-zinc-800 text-lg mb-4 mt-2">{idVendedor === 'Loja Principal' ? 'Sede / Balcão Fixo' : `Vendedor #${idVendedor}`}</h3>
+                <div className="flex justify-between items-center text-sm mb-2"><span className="text-zinc-500 font-bold">Vendido:</span><span className="font-black text-zinc-800">{exibirMoeda(Number(total))}</span></div>
+                <div className="flex justify-between items-center text-sm border-t border-amber-200 pt-2"><span className="text-amber-700 font-black uppercase">Comissão:</span><span className="font-black text-amber-600 text-xl">{exibirMoeda(Number(total) * (taxaComissao / 100))}</span></div>
+              </div>
+            ))}
           </div>
         </div>
       )}
