@@ -15,22 +15,23 @@ export default function DashboardPage() {
   const [usuarioNome, setUsuarioNome] = useState('');
   const [logs, setLogs] = useState<any[]>([]);
 
-  // Controle unificado de todas as abas estratégicas (Inicia no Resumo)
   const [abaAtiva, setAbaAtiva] = useState('geral');
-
-  // Modo Privacidade memorizado pelo navegador
   const [ocultarValores, setOcultarValores] = useState(false);
 
-  // Estados para as Comissões
+  // 🚀 ESTADO PARA MEMORIZAR AS CORREÇÕES RETROATIVAS DE VENDEDORES
+  const [vendedoresManuais, setVendedoresManuais] = useState<Record<number, string>>({});
+
   const [metaLoja, setMetaLoja] = useState<number>(50000); 
   const [taxaComissao, setTaxaComissao] = useState<number>(5);
 
   useEffect(() => {
     carregar();
     const statusSalvo = localStorage.getItem('privacidadeMundoPerfumes');
-    if (statusSalvo === 'true') {
-      setOcultarValores(true);
-    }
+    if (statusSalvo === 'true') setOcultarValores(true);
+
+    // Carrega as correções manuais de vendedores salvas no navegador
+    const vendedoresSalvos = localStorage.getItem('vendedoresRetroativosMundoPerfumes');
+    if (vendedoresSalvos) setVendedoresManuais(JSON.parse(vendedoresSalvos));
   }, []);
 
   async function carregar() {
@@ -47,7 +48,6 @@ export default function DashboardPage() {
     } catch (e) {
       console.error("Erro ao carregar dados financeiros no painel:", e);
     }
-
     setCarregando(false);
   }
 
@@ -55,6 +55,16 @@ export default function DashboardPage() {
     const novoStatus = !ocultarValores;
     setOcultarValores(novoStatus);
     localStorage.setItem('privacidadeMundoPerfumes', String(novoStatus));
+  };
+
+  // 🚀 FUNÇÃO PARA CORRIGIR O PASSADO: Altera o vendedor clicando nele
+  const salvarVendedorManual = (idVenda: number, atual: string) => {
+    const nome = prompt(`Correção de Venda Antiga:\n\nDigite o nome correto de quem fez esta venda (Ex: Izabel, carolina flores, Junior loka):`, atual);
+    if (nome && nome.trim() !== "") {
+      const novos = { ...vendedoresManuais, [idVenda]: nome.trim() };
+      setVendedoresManuais(novos);
+      localStorage.setItem('vendedoresRetroativosMundoPerfumes', JSON.stringify(novos));
+    }
   };
 
   const handleEstornarVenda = async (idVenda: number) => {
@@ -102,7 +112,6 @@ export default function DashboardPage() {
     if (telefone && !telefone.startsWith('55') && telefone.length >= 10) {
       telefone = '55' + telefone;
     }
-    
     let texto = `*O MUNDO DOS PERFUMES* 🛍️\n\nOlá, *${nomeCliente}*, tudo bem?\n\n`;
     if (diasUltimaCompra > 60) {
       texto += `Faz um tempinho que você não nos visita! Chegaram várias novidades e fragrâncias incríveis na loja. Quer conferir o nosso catálogo novo com um desconto especial? ✨`;
@@ -117,7 +126,6 @@ export default function DashboardPage() {
     const pLow = pag.toLowerCase();
     if (pLow === 'credito') return 'CRÉDITO 💳';
     if (pLow === 'debito') return 'DÉBITO 💳';
-    
     if (pLow.startsWith('multiplo:')) {
       if (pag.includes('obs=')) {
         const match = pag.match(/obs=([^;]+)/);
@@ -127,7 +135,6 @@ export default function DashboardPage() {
       }
       return 'MÚLTIPLO 🔀';
     }
-    
     if (pLow.startsWith('venda_direta')) {
       if (pag.includes(':obs=')) {
         const obsExtraida = pag.split(':obs=')[1];
@@ -143,33 +150,34 @@ export default function DashboardPage() {
   const exibirMoeda = (valor: number) => ocultarValores ? 'R$ •••••' : formataMoeda(valor);
 
   // =========================================================================================
-  // 🚀 MAPEAMENTO INTELIGENTE DE USUÁRIOS/VENDEDORES (Resolve o problema do "Caixa/PDV")
+  // MAPEAMENTO INTELIGENTE DE USUÁRIOS/VENDEDORES (Com prioridade para a Correção Manual)
   // =========================================================================================
   const vendedorMapLogs = new Map<number, string>();
   (logs || []).forEach((log: any) => {
     const matchCupom = log.descricao?.match(/Cupom\s*#(\d+)/i);
-    // Ignora nomes de sistema genéricos para resgatar o nome real de quem estava operando
     if (matchCupom && log.usuarioNome && !['Sistema', 'Caixa/PDV'].includes(log.usuarioNome)) {
       vendedorMapLogs.set(Number(matchCupom[1]), log.usuarioNome);
     }
   });
 
   const getNomeExibicaoVendedor = (venda: any) => {
-    // 1. Tenta encontrar o usuário se o backend enviou a lista (Mais seguro)
+    // 1. PRIORIDADE MÁXIMA: Se você corrigiu manualmente clicando, usa esse nome.
+    if (vendedoresManuais[venda.id]) return vendedoresManuais[venda.id];
+    
+    // 2. Tenta encontrar o usuário pelo ID se o backend enviar a lista (Vendas novas)
     if (venda.idVendedor && dados?.listaUsuarios) {
       const u = dados.listaUsuarios.find((x: any) => Number(x.id) === Number(venda.idVendedor));
       if (u && u.nome) return String(u.nome);
     }
-    // 2. Resgata o nome diretamente do histórico oficial de auditoria/logs
-    if (vendedorMapLogs.has(venda.id)) {
-      return String(vendedorMapLogs.get(venda.id));
-    }
-    // 3. Se a venda já tem um nome gravado que NÃO SEJA o genérico "Caixa/PDV", exibe ele
+    
+    // 3. Resgata dos logs da auditoria
+    if (vendedorMapLogs.has(venda.id)) return String(vendedorMapLogs.get(venda.id));
+    
+    // 4. Fallback padrão se não tiver identificação (Vendas antes do sistema de usuários)
     if (venda.vendedorNome && !['Caixa/PDV', 'Sistema', 'Caixa / Balcão'].includes(venda.vendedorNome)) {
       return String(venda.vendedorNome);
     }
-    // 4. Se for uma venda muito antiga sem log, assume Caixa padrão
-    return 'Caixa / PDV';
+    return 'Caixa/PDV';
   };
   // =========================================================================================
 
@@ -376,9 +384,6 @@ export default function DashboardPage() {
     return { ...cliente, totalGasto, qtdCompras: comprasDoCliente.length, dataUltimaCompra, diasSemComprar };
   }).sort((a: any, b: any) => b.totalGasto - a.totalGasto); 
 
-  // =========================================================================================
-  // RECONSTRUÇÃO INFALÍVEL DA AUDITORIA DE ESTOQUE (Retroativa até o 1º dia do sistema)
-  // =========================================================================================
   const historicoAuditoria: any[] = [];
   const idsVendasNosLogs = new Set<number>();
 
@@ -453,7 +458,6 @@ export default function DashboardPage() {
   });
 
   historicoAuditoria.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
-
 
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
@@ -573,9 +577,16 @@ export default function DashboardPage() {
                       <td className={`p-3 text-sm font-black ${venda.status === 'cancelada' ? 'text-zinc-400 line-through' : 'text-green-600'}`}>{exibirMoeda(venda.total)}</td>
                       <td className="p-3 text-xs font-bold text-zinc-500 uppercase">{formatarPagamentoTabela(venda.formaPagamento)}</td>
                       
-                      {/* 🚀 EXIBINDO O VENDEDOR CORRETAMENTE MAPEADO */}
-                      <td className="p-3 text-xs font-bold text-zinc-600 truncate max-w-[120px]" title={getNomeExibicaoVendedor(venda)}>
-                        👤 {getNomeExibicaoVendedor(venda)}
+                      {/* 🚀 BOTÃO DE CORREÇÃO MANUAL DO VENDEDOR */}
+                      <td 
+                        className="p-3 text-xs font-bold text-zinc-600 truncate max-w-[120px] cursor-pointer hover:text-blue-600 group" 
+                        title="Clique para corrigir o nome do vendedor desta venda"
+                        onClick={() => isAdmin && salvarVendedorManual(venda.id, getNomeExibicaoVendedor(venda))}
+                      >
+                        <span className="flex items-center gap-1">
+                          👤 {getNomeExibicaoVendedor(venda)} {vendedoresManuais[venda.id] && <span className="text-amber-500" title="Corrigido manualmente">*</span>}
+                          {isAdmin && <span className="opacity-0 group-hover:opacity-100 transition-opacity">✏️</span>}
+                        </span>
                       </td>
 
                       <td className="p-3"><span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${venda.status === 'cancelada' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{venda.status === 'cancelada' ? 'Cancelada' : 'Concluída'}</span></td>
@@ -807,7 +818,6 @@ export default function DashboardPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {Object.entries(vendasMes.reduce((acc: any, v: any) => { 
-              // Agrupamento agora usa o nome inteligente rastreado!
               const nome = getNomeExibicaoVendedor(v); 
               acc[nome] = (acc[nome] || 0) + Number(v.total || 0); 
               return acc; 
