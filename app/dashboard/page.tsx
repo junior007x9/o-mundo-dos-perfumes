@@ -118,6 +118,7 @@ export default function DashboardPage() {
     if (telefone && !telefone.startsWith('55') && telefone.length >= 10) {
       telefone = '55' + telefone;
     }
+    
     let texto = `*O MUNDO DOS PERFUMES* 🛍️\n\nOlá, *${nomeCliente}*, tudo bem?\n\n`;
     if (diasUltimaCompra > 60) {
       texto += `Faz um tempinho que você não nos visita! Chegaram várias novidades e fragrâncias incríveis na loja. Quer conferir o nosso catálogo novo com um desconto especial? ✨`;
@@ -156,7 +157,7 @@ export default function DashboardPage() {
   const exibirMoeda = (valor: number) => ocultarValores ? 'R$ •••••' : formataMoeda(valor);
 
   // =========================================================================================
-  // 🚀 LÓGICA INFALÍVEL DE RESGATE DE VENDEDORES (Conectada com o banco de dados)
+  // 🚀 LÓGICA INFALÍVEL DE RESGATE DE VENDEDORES (Blindada para TypeScript)
   // =========================================================================================
   const vendedorMapLogs = new Map<number, string>();
   const correcoesManuaisLogs = new Map<number, string>();
@@ -183,12 +184,13 @@ export default function DashboardPage() {
     }
   });
 
-  const getNomeExibicaoVendedor = (venda: any) => {
+  // 🚀 Função agora garante retornar estritamente UMA STRING (Evita erro da Vercel)
+  const getNomeExibicaoVendedor = (venda: any): string => {
     // 1ª Prioridade: A correção oficial cravada na nuvem
-    if (correcoesManuaisLogs.has(venda.id)) return correcoesManuaisLogs.get(venda.id);
+    if (correcoesManuaisLogs.has(venda.id)) return String(correcoesManuaisLogs.get(venda.id));
     
     // 2ª Prioridade: A correção visual feita no celular antes do reload
-    if (vendedoresManuais[venda.id]) return vendedoresManuais[venda.id];
+    if (vendedoresManuais[venda.id]) return String(vendedoresManuais[venda.id]);
     
     // 3ª Prioridade: A identidade enviada pelo banco nas vendas novas
     if (venda.idVendedor && dados?.listaUsuarios) {
@@ -199,7 +201,7 @@ export default function DashboardPage() {
     // 4ª Prioridade: O nome que ficou gravado nos logs automáticos do passado
     if (vendedorMapLogs.has(venda.id)) return String(vendedorMapLogs.get(venda.id));
     
-    // 5ª Prioridade: Fallback final
+    // 5ª Prioridade: Fallback final garantido
     return 'Caixa / PDV';
   };
   // =========================================================================================
@@ -603,7 +605,7 @@ export default function DashboardPage() {
                       <td 
                         className="p-3 text-xs font-bold text-zinc-600 truncate max-w-[120px] cursor-pointer hover:text-blue-600 group" 
                         title="Clique para corrigir o nome do vendedor desta venda"
-                        onClick={() => isAdmin && salvarVendedorManual(venda.id, getNomeExibicaoVendedor(venda))}
+                        onClick={() => isAdmin && salvarVendedorManual(venda.id, String(getNomeExibicaoVendedor(venda)))}
                       >
                         <span className="flex items-center gap-1">
                           👤 {getNomeExibicaoVendedor(venda)}
