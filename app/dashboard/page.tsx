@@ -15,9 +15,13 @@ export default function DashboardPage() {
   const [usuarioNome, setUsuarioNome] = useState('');
   const [logs, setLogs] = useState<any[]>([]);
 
+  // 🚀 Controle unificado de todas as abas estratégicas (Inicia no Resumo)
   const [abaAtiva, setAbaAtiva] = useState('geral');
+
+  // Modo Privacidade memorizado pelo navegador
   const [ocultarValores, setOcultarValores] = useState(false);
 
+  // Estados para as Comissões
   const [metaLoja, setMetaLoja] = useState<number>(50000); 
   const [taxaComissao, setTaxaComissao] = useState<number>(5);
 
@@ -147,7 +151,8 @@ export default function DashboardPage() {
     let csvCompleto = "\uFEFF"; 
     csvCompleto += "O MUNDO DOS PERFUMES\nRELATÓRIO GERENCIAL DE VENDAS\n";
     csvCompleto += `Data de Emissão: ${dataEmissao}\n\n`;
-    csvCompleto += "Código do Cupom;Data e Hora;Forma de Pagamento;Status da Venda;Valor da Venda (R$)\n";
+    // 🚀 ADICIONADO: Coluna Vendedor no Excel
+    csvCompleto += "Código do Cupom;Data e Hora;Vendedor;Forma de Pagamento;Status da Venda;Valor da Venda (R$)\n";
 
     dados.listaVendas.forEach((v: any) => {
       const idCupom = `#${v.id}`;
@@ -155,9 +160,12 @@ export default function DashboardPage() {
       const pagamentoStr = v.formaPagamento ? v.formaPagamento.toUpperCase() : 'DINHEIRO';
       const statusStr = v.status === 'cancelada' ? 'CANCELADA' : 'CONCLUÍDA';
       const valorStr = v.total.toFixed(2).replace('.', ',');
-      csvCompleto += `${idCupom};${dataHora};${pagamentoStr};${statusStr};${valorStr}\n`;
+      const vendedorStr = v.vendedorNome ? v.vendedorNome.toUpperCase() : 'CAIXA/PDV';
+
+      csvCompleto += `${idCupom};${dataHora};${vendedorStr};${pagamentoStr};${statusStr};${valorStr}\n`;
     });
-    csvCompleto += `\n;;;TOTAL FATURADO LÍQUIDO:;${totalRelatorio.toFixed(2).replace('.', ',')}\n`;
+    // Ajuste nos ponto e vírgulas para alinhar o total com a coluna de valor
+    csvCompleto += `\n;;;;TOTAL FATURADO LÍQUIDO:;${totalRelatorio.toFixed(2).replace('.', ',')}\n`;
 
     const blob = new Blob([csvCompleto], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -182,7 +190,16 @@ export default function DashboardPage() {
       const statusClasse = v.status === 'cancelada' ? 'status-cancelada' : 'status-concluida';
       const statusTexto = v.status === 'cancelada' ? 'CANCELADA' : 'CONCLUÍDA';
       const valorClasse = v.status === 'cancelada' ? 'valor-cancelado' : 'valor-concluido';
-      return `<tr class="${v.status === 'cancelada' ? 'linha-cancelada' : ''}"><td><strong>#${v.id}</strong></td><td>${new Date(v.data).toLocaleString('pt-BR')}</td><td>${formatarPagamentoTabela(v.formaPagamento)}</td><td><span class="status-badge ${statusClasse}">${statusTexto}</span></td><td class="right bold ${valorClasse}">${formataMoeda(v.total)}</td></tr>`;
+      const vendedorTexto = v.vendedorNome ? v.vendedorNome.toUpperCase() : 'CAIXA/PDV';
+      
+      return `<tr class="${v.status === 'cancelada' ? 'linha-cancelada' : ''}">
+                <td><strong>#${v.id}</strong></td>
+                <td>${new Date(v.data).toLocaleString('pt-BR')}</td>
+                <td><span style="font-size: 8pt; font-weight: bold; color: #4a5568;">👤 ${vendedorTexto}</span></td>
+                <td>${formatarPagamentoTabela(v.formaPagamento)}</td>
+                <td><span class="status-badge ${statusClasse}">${statusTexto}</span></td>
+                <td class="right bold ${valorClasse}">${formataMoeda(v.total)}</td>
+              </tr>`;
     }).join('');
 
     popup.document.write(`
@@ -198,7 +215,22 @@ export default function DashboardPage() {
         </head>
         <body>
           <div class="header"><div class="header-left"><h1>O MUNDO DOS PERFUMES</h1></div><div class="header-right"><p>Data: <strong>${dataEmissao}</strong></p></div></div>
-          <table><thead><tr><th style="width: 12%;">Cupom</th><th style="width: 25%;">Data e Hora</th><th style="width: 33%;">Forma de Pagamento</th><th style="width: 15%;">Status</th><th style="width: 15%;" class="right">Valor Líquido</th></tr></thead><tbody>${linhasTabela}<tr class="total-row bold"><td colspan="3"></td><td>TOTAL LÍQUIDO:</td><td class="right">${formataMoeda(totalRelatorio)}</td></tr></tbody></table>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 10%;">Cupom</th>
+                <th style="width: 18%;">Data e Hora</th>
+                <th style="width: 17%;">Vendedor</th>
+                <th style="width: 25%;">Pagamento</th>
+                <th style="width: 15%;">Status</th>
+                <th style="width: 15%;" class="right">Valor Líquido</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${linhasTabela}
+              <tr class="total-row bold"><td colspan="4"></td><td>TOTAL LÍQUIDO:</td><td class="right">${formataMoeda(totalRelatorio)}</td></tr>
+            </tbody>
+          </table>
         </body>
       </html>
     `);
@@ -340,19 +372,17 @@ export default function DashboardPage() {
   }).sort((a: any, b: any) => b.totalGasto - a.totalGasto); 
 
   // =========================================================================================
-  // 🚀 RECONSTRUÇÃO INFALÍVEL DA AUDITORIA DE ESTOQUE (Retroativa até o 1º dia do sistema)
+  // 🚀 RECONSTRUÇÃO DA AUDITORIA DE ESTOQUE (Retroativa)
   // =========================================================================================
   const historicoAuditoria: any[] = [];
   const idsVendasNosLogs = new Set<number>();
 
-  // 1. Processar os logs do banco (Kits desmanchados, adições, etc.)
   logs.filter((log: any) => log.categoria === 'produto' || log.categoria === 'venda').forEach((log: any) => {
     let textoDescricao = log.descricao;
     const descLower = textoDescricao.toLowerCase();
     let tipoBadge = "📦 AJUSTE / OUTROS";
     let corBadge = "bg-blue-50 text-blue-700 border-blue-200";
 
-    // Detecta se o log atual pertence a uma venda para enriquecer o texto com o tipo de pagamento
     const match = textoDescricao.match(/Cupom #(\d+)/i);
     if (match) {
       const vendaId = Number(match[1]);
@@ -383,12 +413,9 @@ export default function DashboardPage() {
     });
   });
 
-  // 2. Busca o passado: Vendas antigas de Maio/Junho que não têm registro na tabela de logs nova
   listaVendas.forEach((v: any) => {
     if (!idsVendasNosLogs.has(v.id)) {
       const pag = formatarPagamentoTabela(v.formaPagamento);
-      
-      // Cruza com a tabela de Itens para saber exatamente o que saiu do estoque naquele dia
       const itensVendaLocal = listaItens.filter((i: any) => i.idVenda === v.id);
       const nomesItens = itensVendaLocal.map((i: any) => {
         const prod = listaProdutos.find((p: any) => p.id === i.idProduto);
@@ -404,7 +431,6 @@ export default function DashboardPage() {
         autor: v.vendedorNome || 'Caixa/PDV'
       });
 
-      // Se a venda de Maio foi cancelada, gera o log de devolução da mercadoria para o estoque
       if (v.status === 'cancelada') {
         const dataCancelamento = new Date(new Date(v.data).getTime() + 1000).toISOString();
         historicoAuditoria.push({
@@ -419,7 +445,6 @@ export default function DashboardPage() {
     }
   });
 
-  // 3. Ordena o Histórico Total (do mais recente para o mais antigo de todos)
   historicoAuditoria.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
 
 
@@ -442,6 +467,7 @@ export default function DashboardPage() {
         </button>
       </div>
 
+      {/* MENU DE ABAS ATUALIZADO */}
       <div className="flex overflow-x-auto gap-2 border-b border-zinc-200 pb-px scrollbar-none">
         <button onClick={() => setAbaAtiva('geral')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'geral' ? 'border-[#6A283A] text-[#6A283A]' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>📊 Resumo</button>
         <button onClick={() => setAbaAtiva('receber')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'receber' ? 'border-purple-600 text-purple-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>📝 A Receber</button>
@@ -529,6 +555,8 @@ export default function DashboardPage() {
                     <th className="p-3 text-xs font-bold text-zinc-600 bg-zinc-50">Data</th>
                     <th className="p-3 text-xs font-bold text-zinc-600 bg-zinc-50">Valor</th>
                     <th className="p-3 text-xs font-bold text-zinc-600 bg-zinc-50">Pagamento</th>
+                    {/* 🚀 NOVA COLUNA: VENDEDOR */}
+                    <th className="p-3 text-xs font-bold text-zinc-600 bg-zinc-50">Vendedor</th>
                     <th className="p-3 text-xs font-bold text-zinc-600 bg-zinc-50">Status</th>
                     <th className="p-3 text-xs font-bold text-zinc-600 text-right bg-zinc-50">Ação</th>
                   </tr>
@@ -539,6 +567,8 @@ export default function DashboardPage() {
                       <td className="p-3 text-sm text-zinc-600">{new Date(venda.data).toLocaleString('pt-BR')}</td>
                       <td className={`p-3 text-sm font-black ${venda.status === 'cancelada' ? 'text-zinc-400 line-through' : 'text-green-600'}`}>{exibirMoeda(venda.total)}</td>
                       <td className="p-3 text-xs font-bold text-zinc-500 uppercase">{formatarPagamentoTabela(venda.formaPagamento)}</td>
+                      {/* 🚀 DADO DA NOVA COLUNA */}
+                      <td className="p-3 text-xs font-bold text-zinc-700">👤 {venda.vendedorNome || 'Caixa/PDV'}</td>
                       <td className="p-3"><span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${venda.status === 'cancelada' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{venda.status === 'cancelada' ? 'Cancelada' : 'Concluída'}</span></td>
                       <td className="p-3 text-right">
                         {venda.status !== 'cancelada' && (
@@ -597,7 +627,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ==================== ABA DE AUDITORIA DE ESTOQUE ==================== */}
+      {/* ==================== 🚀 ABA DE AUDITORIA DE ESTOQUE ==================== */}
       {abaAtiva === 'auditoria' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300 space-y-4">
           <div className="flex flex-col md:flex-row justify-between md:items-center gap-2 border-b border-zinc-100 pb-4">
