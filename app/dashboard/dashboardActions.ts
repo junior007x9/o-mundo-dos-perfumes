@@ -63,7 +63,6 @@ export async function cancelarVendaAction(idVenda: number) {
   revalidatePath('/dashboard');
 }
 
-// 🚀 PASSO 1: FUNÇÃO PARA QUITAR TOTALMENTE A DÍVIDA (BLINDADA)
 export async function quitarVendaAction(idVenda: number) {
   const usu = await getUsuarioLogado();
   const nomeUsuario = usu?.nome || 'Sistema';
@@ -72,7 +71,6 @@ export async function quitarVendaAction(idVenda: number) {
   const vendaAtual = resVenda[0];
 
   if (vendaAtual) {
-    // 🚀 Garante que a forma de pagamento é uma string para evitar o erro de 'null'
     const formaSegura = String(vendaAtual.formaPagamento || '');
     const novaFormaPagamento = `${formaSegura};pago=true`;
     
@@ -89,7 +87,6 @@ export async function quitarVendaAction(idVenda: number) {
   revalidatePath('/dashboard');
 }
 
-// 🚀 PASSO 1: FUNÇÃO PARA ATUALIZAR A NOTA DE CONFERÊNCIA (BLINDADA)
 export async function atualizarNotaReceberAction(idVenda: number, novaNota: string) {
   const usu = await getUsuarioLogado();
   const nomeUsuario = usu?.nome || 'Sistema';
@@ -98,10 +95,8 @@ export async function atualizarNotaReceberAction(idVenda: number, novaNota: stri
   const vendaAtual = resVenda[0];
 
   if (vendaAtual) {
-    // 🚀 Converte estritamente para string para que o split não trave
     const formaSegura = String(vendaAtual.formaPagamento || '');
     
-    // Remove qualquer anotação antiga para evitar duplicação e anexa a nova
     const formaLimpa = formaSegura.split(';obs=')[0].split(':obs=')[0];
     const prefixo = formaSegura.startsWith('venda_direta') ? 'venda_direta:obs=' : `${formaLimpa};obs=`;
     const novaForma = `${prefixo}${novaNota.replace(/[:;=]/g, ' ')}`;
@@ -110,6 +105,29 @@ export async function atualizarNotaReceberAction(idVenda: number, novaNota: stri
 
     await db.insert(logsSistema).values({
       descricao: `📝 Histórico de parcelas da Venda #${idVenda} modificado para: "${novaNota}".`,
+      data: new Date().toISOString(),
+      categoria: 'venda',
+      usuarioNome: nomeUsuario
+    });
+  }
+
+  revalidatePath('/dashboard');
+}
+
+// 🚀 NOVA FUNÇÃO: ATUALIZA O VENDEDOR DEFINITIVAMENTE NO BANCO DE DADOS
+export async function atualizarVendedorAction(idVenda: number, novoVendedor: string) {
+  const usu = await getUsuarioLogado();
+  const nomeUsuario = usu?.nome || 'Sistema';
+
+  const resVenda = await db.select().from(vendas).where(eq(vendas.id, idVenda)).limit(1);
+  
+  if (resVenda.length > 0) {
+    await db.update(vendas)
+      .set({ vendedorNome: novoVendedor })
+      .where(eq(vendas.id, idVenda));
+
+    await db.insert(logsSistema).values({
+      descricao: `✏️ Vendedor da Venda #${idVenda} alterado no sistema para: "${novoVendedor}".`,
       data: new Date().toISOString(),
       categoria: 'venda',
       usuarioNome: nomeUsuario

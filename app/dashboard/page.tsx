@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getDadosDashboard, cancelarVendaAction, quitarVendaAction, atualizarNotaReceberAction } from './dashboardActions';
+import { getDadosDashboard, cancelarVendaAction, quitarVendaAction, atualizarNotaReceberAction, atualizarVendedorAction } from './dashboardActions';
 import { getDadosFinanceiros } from './financeiro/actions'; 
 import Link from 'next/link';
 
@@ -18,9 +18,6 @@ export default function DashboardPage() {
   const [abaAtiva, setAbaAtiva] = useState('geral');
   const [ocultarValores, setOcultarValores] = useState(false);
 
-  // 🚀 ESTADO PARA MEMORIZAR AS CORREÇÕES RETROATIVAS DE VENDEDORES
-  const [vendedoresManuais, setVendedoresManuais] = useState<Record<number, string>>({});
-
   const [metaLoja, setMetaLoja] = useState<number>(50000); 
   const [taxaComissao, setTaxaComissao] = useState<number>(5);
 
@@ -28,10 +25,6 @@ export default function DashboardPage() {
     carregar();
     const statusSalvo = localStorage.getItem('privacidadeMundoPerfumes');
     if (statusSalvo === 'true') setOcultarValores(true);
-
-    // Carrega as correções manuais de vendedores salvas no navegador
-    const vendedoresSalvos = localStorage.getItem('vendedoresRetroativosMundoPerfumes');
-    if (vendedoresSalvos) setVendedoresManuais(JSON.parse(vendedoresSalvos));
   }, []);
 
   async function carregar() {
@@ -57,13 +50,13 @@ export default function DashboardPage() {
     localStorage.setItem('privacidadeMundoPerfumes', String(novoStatus));
   };
 
-  // 🚀 FUNÇÃO PARA CORRIGIR O PASSADO: Altera o vendedor clicando nele
-  const salvarVendedorManual = (idVenda: number, atual: string) => {
-    const nome = prompt(`Correção de Venda Antiga:\n\nDigite o nome correto de quem fez esta venda (Ex: Izabel, carolina flores, Junior loka):`, atual);
-    if (nome && nome.trim() !== "") {
-      const novos = { ...vendedoresManuais, [idVenda]: nome.trim() };
-      setVendedoresManuais(novos);
-      localStorage.setItem('vendedoresRetroativosMundoPerfumes', JSON.stringify(novos));
+  // 🚀 FUNÇÃO PARA CORRIGIR O PASSADO DIRETAMENTE NO BANCO DE DADOS
+  const salvarVendedorManual = async (idVenda: number, atual: string) => {
+    const nome = prompt(`Correção Definitiva de Venda Antiga:\n\nDigite o nome correto de quem fez esta venda (Ex: Izabel, carolina flores, Junior loka):`, atual);
+    if (nome && nome.trim() !== "" && nome.trim() !== atual) {
+      await atualizarVendedorAction(idVenda, nome.trim());
+      alert('✅ Vendedor atualizado com sucesso no banco de dados!');
+      carregar(); // Recarrega os dados fresquinhos do banco
     }
   };
 
@@ -112,6 +105,7 @@ export default function DashboardPage() {
     if (telefone && !telefone.startsWith('55') && telefone.length >= 10) {
       telefone = '55' + telefone;
     }
+    
     let texto = `*O MUNDO DOS PERFUMES* 🛍️\n\nOlá, *${nomeCliente}*, tudo bem?\n\n`;
     if (diasUltimaCompra > 60) {
       texto += `Faz um tempinho que você não nos visita! Chegaram várias novidades e fragrâncias incríveis na loja. Quer conferir o nosso catálogo novo com um desconto especial? ✨`;
@@ -150,7 +144,7 @@ export default function DashboardPage() {
   const exibirMoeda = (valor: number) => ocultarValores ? 'R$ •••••' : formataMoeda(valor);
 
   // =========================================================================================
-  // MAPEAMENTO INTELIGENTE DE USUÁRIOS/VENDEDORES (Com prioridade para a Correção Manual)
+  // MAPEAMENTO INTELIGENTE DE USUÁRIOS/VENDEDORES
   // =========================================================================================
   const vendedorMapLogs = new Map<number, string>();
   (logs || []).forEach((log: any) => {
@@ -161,8 +155,10 @@ export default function DashboardPage() {
   });
 
   const getNomeExibicaoVendedor = (venda: any) => {
-    // 1. PRIORIDADE MÁXIMA: Se você corrigiu manualmente clicando, usa esse nome.
-    if (vendedoresManuais[venda.id]) return vendedoresManuais[venda.id];
+    // 1. Se já existir um nome gravado no banco explicitamente (via correção manual nossa)
+    if (venda.vendedorNome && !['Caixa/PDV', 'Sistema', 'Caixa / Balcão'].includes(venda.vendedorNome)) {
+      return String(venda.vendedorNome);
+    }
     
     // 2. Tenta encontrar o usuário pelo ID se o backend enviar a lista (Vendas novas)
     if (venda.idVendedor && dados?.listaUsuarios) {
@@ -173,10 +169,7 @@ export default function DashboardPage() {
     // 3. Resgata dos logs da auditoria
     if (vendedorMapLogs.has(venda.id)) return String(vendedorMapLogs.get(venda.id));
     
-    // 4. Fallback padrão se não tiver identificação (Vendas antes do sistema de usuários)
-    if (venda.vendedorNome && !['Caixa/PDV', 'Sistema', 'Caixa / Balcão'].includes(venda.vendedorNome)) {
-      return String(venda.vendedorNome);
-    }
+    // 4. Fallback padrão se não tiver identificação
     return 'Caixa/PDV';
   };
   // =========================================================================================
@@ -577,14 +570,14 @@ export default function DashboardPage() {
                       <td className={`p-3 text-sm font-black ${venda.status === 'cancelada' ? 'text-zinc-400 line-through' : 'text-green-600'}`}>{exibirMoeda(venda.total)}</td>
                       <td className="p-3 text-xs font-bold text-zinc-500 uppercase">{formatarPagamentoTabela(venda.formaPagamento)}</td>
                       
-                      {/* 🚀 BOTÃO DE CORREÇÃO MANUAL DO VENDEDOR */}
+                      {/* 🚀 BOTÃO DE CORREÇÃO MANUAL DO VENDEDOR (Agora grava na nuvem) */}
                       <td 
                         className="p-3 text-xs font-bold text-zinc-600 truncate max-w-[120px] cursor-pointer hover:text-blue-600 group" 
                         title="Clique para corrigir o nome do vendedor desta venda"
                         onClick={() => isAdmin && salvarVendedorManual(venda.id, getNomeExibicaoVendedor(venda))}
                       >
                         <span className="flex items-center gap-1">
-                          👤 {getNomeExibicaoVendedor(venda)} {vendedoresManuais[venda.id] && <span className="text-amber-500" title="Corrigido manualmente">*</span>}
+                          👤 {getNomeExibicaoVendedor(venda)}
                           {isAdmin && <span className="opacity-0 group-hover:opacity-100 transition-opacity">✏️</span>}
                         </span>
                       </td>
