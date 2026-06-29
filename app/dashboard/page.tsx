@@ -15,7 +15,7 @@ export default function DashboardPage() {
   const [usuarioNome, setUsuarioNome] = useState('');
   const [logs, setLogs] = useState<any[]>([]);
 
-  // 🚀 Controle unificado de todas as abas estratégicas (Inicia no Resumo)
+  // Controle unificado de todas as abas estratégicas (Inicia no Resumo)
   const [abaAtiva, setAbaAtiva] = useState('geral');
 
   // Modo Privacidade memorizado pelo navegador
@@ -142,6 +142,37 @@ export default function DashboardPage() {
   const formataMoeda = (valor: number) => valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const exibirMoeda = (valor: number) => ocultarValores ? 'R$ •••••' : formataMoeda(valor);
 
+  // =========================================================================================
+  // 🚀 MAPEAMENTO INTELIGENTE DE USUÁRIOS/VENDEDORES (Resolve o problema do "Caixa/PDV")
+  // =========================================================================================
+  const vendedorMapLogs = new Map<number, string>();
+  (logs || []).forEach((log: any) => {
+    const matchCupom = log.descricao?.match(/Cupom\s*#(\d+)/i);
+    // Ignora nomes de sistema genéricos para resgatar o nome real de quem estava operando
+    if (matchCupom && log.usuarioNome && !['Sistema', 'Caixa/PDV'].includes(log.usuarioNome)) {
+      vendedorMapLogs.set(Number(matchCupom[1]), log.usuarioNome);
+    }
+  });
+
+  const getNomeExibicaoVendedor = (venda: any) => {
+    // 1. Tenta encontrar o usuário se o backend enviou a lista (Mais seguro)
+    if (venda.idVendedor && dados?.listaUsuarios) {
+      const u = dados.listaUsuarios.find((x: any) => Number(x.id) === Number(venda.idVendedor));
+      if (u && u.nome) return String(u.nome);
+    }
+    // 2. Resgata o nome diretamente do histórico oficial de auditoria/logs
+    if (vendedorMapLogs.has(venda.id)) {
+      return String(vendedorMapLogs.get(venda.id));
+    }
+    // 3. Se a venda já tem um nome gravado que NÃO SEJA o genérico "Caixa/PDV", exibe ele
+    if (venda.vendedorNome && !['Caixa/PDV', 'Sistema', 'Caixa / Balcão'].includes(venda.vendedorNome)) {
+      return String(venda.vendedorNome);
+    }
+    // 4. Se for uma venda muito antiga sem log, assume Caixa padrão
+    return 'Caixa / PDV';
+  };
+  // =========================================================================================
+
   const exportarParaExcel = () => {
     if (!dados || !dados.listaVendas || dados.listaVendas.length === 0) return;
     const vendasValidasRelatorio = dados.listaVendas.filter((v: any) => v.status !== 'cancelada');
@@ -151,20 +182,17 @@ export default function DashboardPage() {
     let csvCompleto = "\uFEFF"; 
     csvCompleto += "O MUNDO DOS PERFUMES\nRELATÓRIO GERENCIAL DE VENDAS\n";
     csvCompleto += `Data de Emissão: ${dataEmissao}\n\n`;
-    // 🚀 ADICIONADO: Coluna Vendedor no Excel
     csvCompleto += "Código do Cupom;Data e Hora;Vendedor;Forma de Pagamento;Status da Venda;Valor da Venda (R$)\n";
 
     dados.listaVendas.forEach((v: any) => {
       const idCupom = `#${v.id}`;
       const dataHora = new Date(v.data).toLocaleString('pt-BR');
+      const vendedorStr = getNomeExibicaoVendedor(v);
       const pagamentoStr = v.formaPagamento ? v.formaPagamento.toUpperCase() : 'DINHEIRO';
       const statusStr = v.status === 'cancelada' ? 'CANCELADA' : 'CONCLUÍDA';
       const valorStr = v.total.toFixed(2).replace('.', ',');
-      const vendedorStr = v.vendedorNome ? v.vendedorNome.toUpperCase() : 'CAIXA/PDV';
-
       csvCompleto += `${idCupom};${dataHora};${vendedorStr};${pagamentoStr};${statusStr};${valorStr}\n`;
     });
-    // Ajuste nos ponto e vírgulas para alinhar o total com a coluna de valor
     csvCompleto += `\n;;;;TOTAL FATURADO LÍQUIDO:;${totalRelatorio.toFixed(2).replace('.', ',')}\n`;
 
     const blob = new Blob([csvCompleto], { type: 'text/csv;charset=utf-8;' });
@@ -190,16 +218,8 @@ export default function DashboardPage() {
       const statusClasse = v.status === 'cancelada' ? 'status-cancelada' : 'status-concluida';
       const statusTexto = v.status === 'cancelada' ? 'CANCELADA' : 'CONCLUÍDA';
       const valorClasse = v.status === 'cancelada' ? 'valor-cancelado' : 'valor-concluido';
-      const vendedorTexto = v.vendedorNome ? v.vendedorNome.toUpperCase() : 'CAIXA/PDV';
-      
-      return `<tr class="${v.status === 'cancelada' ? 'linha-cancelada' : ''}">
-                <td><strong>#${v.id}</strong></td>
-                <td>${new Date(v.data).toLocaleString('pt-BR')}</td>
-                <td><span style="font-size: 8pt; font-weight: bold; color: #4a5568;">👤 ${vendedorTexto}</span></td>
-                <td>${formatarPagamentoTabela(v.formaPagamento)}</td>
-                <td><span class="status-badge ${statusClasse}">${statusTexto}</span></td>
-                <td class="right bold ${valorClasse}">${formataMoeda(v.total)}</td>
-              </tr>`;
+      const vendedorStr = getNomeExibicaoVendedor(v);
+      return `<tr class="${v.status === 'cancelada' ? 'linha-cancelada' : ''}"><td><strong>#${v.id}</strong></td><td>${new Date(v.data).toLocaleString('pt-BR')}</td><td>${vendedorStr}</td><td>${formatarPagamentoTabela(v.formaPagamento)}</td><td><span class="status-badge ${statusClasse}">${statusTexto}</span></td><td class="right bold ${valorClasse}">${formataMoeda(v.total)}</td></tr>`;
     }).join('');
 
     popup.document.write(`
@@ -215,22 +235,7 @@ export default function DashboardPage() {
         </head>
         <body>
           <div class="header"><div class="header-left"><h1>O MUNDO DOS PERFUMES</h1></div><div class="header-right"><p>Data: <strong>${dataEmissao}</strong></p></div></div>
-          <table>
-            <thead>
-              <tr>
-                <th style="width: 10%;">Cupom</th>
-                <th style="width: 18%;">Data e Hora</th>
-                <th style="width: 17%;">Vendedor</th>
-                <th style="width: 25%;">Pagamento</th>
-                <th style="width: 15%;">Status</th>
-                <th style="width: 15%;" class="right">Valor Líquido</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${linhasTabela}
-              <tr class="total-row bold"><td colspan="4"></td><td>TOTAL LÍQUIDO:</td><td class="right">${formataMoeda(totalRelatorio)}</td></tr>
-            </tbody>
-          </table>
+          <table><thead><tr><th style="width: 10%;">Cupom</th><th style="width: 20%;">Data e Hora</th><th style="width: 15%;">Vendedor</th><th style="width: 25%;">Forma de Pagamento</th><th style="width: 15%;">Status</th><th style="width: 15%;" class="right">Valor Líquido</th></tr></thead><tbody>${linhasTabela}<tr class="total-row bold"><td colspan="4"></td><td>TOTAL LÍQUIDO:</td><td class="right">${formataMoeda(totalRelatorio)}</td></tr></tbody></table>
         </body>
       </html>
     `);
@@ -372,7 +377,7 @@ export default function DashboardPage() {
   }).sort((a: any, b: any) => b.totalGasto - a.totalGasto); 
 
   // =========================================================================================
-  // 🚀 RECONSTRUÇÃO DA AUDITORIA DE ESTOQUE (Retroativa)
+  // RECONSTRUÇÃO INFALÍVEL DA AUDITORIA DE ESTOQUE (Retroativa até o 1º dia do sistema)
   // =========================================================================================
   const historicoAuditoria: any[] = [];
   const idsVendasNosLogs = new Set<number>();
@@ -416,6 +421,8 @@ export default function DashboardPage() {
   listaVendas.forEach((v: any) => {
     if (!idsVendasNosLogs.has(v.id)) {
       const pag = formatarPagamentoTabela(v.formaPagamento);
+      const vendedorRetroativo = getNomeExibicaoVendedor(v);
+      
       const itensVendaLocal = listaItens.filter((i: any) => i.idVenda === v.id);
       const nomesItens = itensVendaLocal.map((i: any) => {
         const prod = listaProdutos.find((p: any) => p.id === i.idProduto);
@@ -428,7 +435,7 @@ export default function DashboardPage() {
         badge: "📉 BAIXA (SAÍDA)",
         corBadge: "bg-red-50 text-red-700 border-red-200",
         descricao: `Venda finalizada via ${pag} (Cupom #${v.id}). Estoque reduzido. Itens: ${nomesItens || 'Registos antigos'}`,
-        autor: v.vendedorNome || 'Caixa/PDV'
+        autor: vendedorRetroativo
       });
 
       if (v.status === 'cancelada') {
@@ -467,7 +474,6 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      {/* MENU DE ABAS ATUALIZADO */}
       <div className="flex overflow-x-auto gap-2 border-b border-zinc-200 pb-px scrollbar-none">
         <button onClick={() => setAbaAtiva('geral')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'geral' ? 'border-[#6A283A] text-[#6A283A]' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>📊 Resumo</button>
         <button onClick={() => setAbaAtiva('receber')} className={`px-4 py-3 text-xs font-black uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${abaAtiva === 'receber' ? 'border-purple-600 text-purple-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}>📝 A Receber</button>
@@ -555,7 +561,6 @@ export default function DashboardPage() {
                     <th className="p-3 text-xs font-bold text-zinc-600 bg-zinc-50">Data</th>
                     <th className="p-3 text-xs font-bold text-zinc-600 bg-zinc-50">Valor</th>
                     <th className="p-3 text-xs font-bold text-zinc-600 bg-zinc-50">Pagamento</th>
-                    {/* 🚀 NOVA COLUNA: VENDEDOR */}
                     <th className="p-3 text-xs font-bold text-zinc-600 bg-zinc-50">Vendedor</th>
                     <th className="p-3 text-xs font-bold text-zinc-600 bg-zinc-50">Status</th>
                     <th className="p-3 text-xs font-bold text-zinc-600 text-right bg-zinc-50">Ação</th>
@@ -567,8 +572,12 @@ export default function DashboardPage() {
                       <td className="p-3 text-sm text-zinc-600">{new Date(venda.data).toLocaleString('pt-BR')}</td>
                       <td className={`p-3 text-sm font-black ${venda.status === 'cancelada' ? 'text-zinc-400 line-through' : 'text-green-600'}`}>{exibirMoeda(venda.total)}</td>
                       <td className="p-3 text-xs font-bold text-zinc-500 uppercase">{formatarPagamentoTabela(venda.formaPagamento)}</td>
-                      {/* 🚀 DADO DA NOVA COLUNA */}
-                      <td className="p-3 text-xs font-bold text-zinc-700">👤 {venda.vendedorNome || 'Caixa/PDV'}</td>
+                      
+                      {/* 🚀 EXIBINDO O VENDEDOR CORRETAMENTE MAPEADO */}
+                      <td className="p-3 text-xs font-bold text-zinc-600 truncate max-w-[120px]" title={getNomeExibicaoVendedor(venda)}>
+                        👤 {getNomeExibicaoVendedor(venda)}
+                      </td>
+
                       <td className="p-3"><span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${venda.status === 'cancelada' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{venda.status === 'cancelada' ? 'Cancelada' : 'Concluída'}</span></td>
                       <td className="p-3 text-right">
                         {venda.status !== 'cancelada' && (
@@ -627,7 +636,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ==================== 🚀 ABA DE AUDITORIA DE ESTOQUE ==================== */}
+      {/* ==================== ABA DE AUDITORIA DE ESTOQUE ==================== */}
       {abaAtiva === 'auditoria' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300 space-y-4">
           <div className="flex flex-col md:flex-row justify-between md:items-center gap-2 border-b border-zinc-100 pb-4">
@@ -797,10 +806,15 @@ export default function DashboardPage() {
             <div className="w-full bg-zinc-100 rounded-full h-4 overflow-hidden"><div className="bg-gradient-to-r from-amber-400 to-orange-500 h-4 rounded-full" style={{ width: `${Math.min((totalVendidoMes / metaLoja) * 100, 100)}%` }}></div></div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Object.entries(vendasMes.reduce((acc: any, v: any) => { const id = v.idVendedor ? String(v.idVendedor) : 'Loja Principal'; acc[id] = (acc[id] || 0) + Number(v.total || 0); return acc; }, {})).map(([idVendedor, total]: [string, any]) => (
-              <div key={idVendedor} className="border border-amber-200 bg-amber-50/30 rounded-xl p-5 hover:shadow-md relative overflow-hidden">
-                <div className="absolute top-0 right-0 bg-amber-200 text-amber-800 text-[10px] font-black px-3 py-1 rounded-bl-lg uppercase">ID: {idVendedor}</div>
-                <h3 className="font-black text-zinc-800 text-lg mb-4 mt-2">{idVendedor === 'Loja Principal' ? 'Sede / Balcão Fixo' : `Vendedor #${idVendedor}`}</h3>
+            {Object.entries(vendasMes.reduce((acc: any, v: any) => { 
+              // Agrupamento agora usa o nome inteligente rastreado!
+              const nome = getNomeExibicaoVendedor(v); 
+              acc[nome] = (acc[nome] || 0) + Number(v.total || 0); 
+              return acc; 
+            }, {})).map(([nomeVendedor, total]: [string, any]) => (
+              <div key={nomeVendedor} className="border border-amber-200 bg-amber-50/30 rounded-xl p-5 hover:shadow-md relative overflow-hidden">
+                <div className="absolute top-0 right-0 bg-amber-200 text-amber-800 text-[10px] font-black px-3 py-1 rounded-bl-lg uppercase">👤 Vendedor</div>
+                <h3 className="font-black text-zinc-800 text-lg mb-4 mt-2">{nomeVendedor}</h3>
                 <div className="flex justify-between items-center text-sm mb-2"><span className="text-zinc-500 font-bold">Vendido:</span><span className="font-black text-zinc-800">{exibirMoeda(Number(total))}</span></div>
                 <div className="flex justify-between items-center text-sm border-t border-amber-200 pt-2"><span className="text-amber-700 font-black uppercase">Comissão:</span><span className="font-black text-amber-600 text-xl">{exibirMoeda(Number(total) * (taxaComissao / 100))}</span></div>
               </div>
