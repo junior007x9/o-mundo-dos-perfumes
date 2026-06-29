@@ -2,8 +2,8 @@
 'use server'
 
 import { db } from '@/db';
-// 🚀 ADICIONADA A TABELA 'usuarios' PARA CRUZAR OS NOMES!
-import { vendas, produtos, clientes, itensVenda, logsSistema, usuarios } from '@/db/schema';
+// 🚀 CORRIGIDO: A tabela chama-se "vendedores" e não "usuarios"
+import { vendas, produtos, clientes, itensVenda, logsSistema, vendedores } from '@/db/schema';
 import { desc, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { getUsuarioLogado } from '@/app/actions';
@@ -17,10 +17,10 @@ export async function getDadosDashboard() {
   const listaClientes = await db.select().from(clientes);
   const listaItens = await db.select().from(itensVenda);
 
-  // 🚀 CRUCIAL: Buscar a lista de utilizadores para o Dashboard saber quem é quem!
+  // 🚀 CRUCIAL: Busca a lista da tabela correta 'vendedores'
   let listaUsuarios: any[] = [];
   try {
-    listaUsuarios = await db.select().from(usuarios);
+    listaUsuarios = await db.select().from(vendedores);
   } catch (e) {
     console.error("Erro ao carregar a lista de utilizadores:", e);
   }
@@ -37,7 +37,7 @@ export async function getDadosDashboard() {
     listaProdutos, 
     listaClientes, 
     listaItens,
-    listaUsuarios, // 🚀 Agora enviamos a lista para o ecrã do Dashboard!
+    listaUsuarios, // Agora enviamos a lista para o ecrã do Dashboard!
     logs,
     idVendedorLogado: usuario?.id || 0,
     cargoVendedor: usuario?.cargo || 'vendedor'

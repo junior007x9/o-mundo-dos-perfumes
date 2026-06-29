@@ -18,7 +18,6 @@ export default function DashboardPage() {
   const [abaAtiva, setAbaAtiva] = useState('geral');
   const [ocultarValores, setOcultarValores] = useState(false);
 
-  // Fallback rápido visual para correções
   const [vendedoresManuais, setVendedoresManuais] = useState<Record<number, string>>({});
 
   const [metaLoja, setMetaLoja] = useState<number>(50000); 
@@ -154,7 +153,7 @@ export default function DashboardPage() {
   const exibirMoeda = (valor: number) => ocultarValores ? 'R$ •••••' : formataMoeda(valor);
 
   // =========================================================================================
-  // 🚀 LÓGICA INFALÍVEL DE RESGATE DE VENDEDORES (Agora com a lista do Banco de Dados)
+  // 🚀 LÓGICA INFALÍVEL DE RESGATE DE VENDEDORES (Blindada para TypeScript)
   // =========================================================================================
   const vendedorMapLogs = new Map<number, string>();
   const correcoesManuaisLogs = new Map<number, string>();
@@ -180,27 +179,22 @@ export default function DashboardPage() {
   });
 
   const getNomeExibicaoVendedor = (venda: any): string => {
-    // 1ª Prioridade: A correção oficial cravada na nuvem
     if (correcoesManuaisLogs.has(venda.id)) return String(correcoesManuaisLogs.get(venda.id));
-    
-    // 2ª Prioridade: A correção visual feita no celular antes do reload
     if (vendedoresManuais[venda.id]) return String(vendedoresManuais[venda.id]);
     
-    // 3ª Prioridade: 🚀 AQUI ACONTECE A MÁGICA! O banco agora envia a lista de utilizadores
+    // 🚀 TENTA CRUZAR COM A LISTA DA TABELA 'vendedores'
     if (venda.idVendedor && dados?.listaUsuarios) {
       const u = dados.listaUsuarios.find((x: any) => Number(x.id) === Number(venda.idVendedor));
       if (u && u.nome) return String(u.nome);
     }
     
-    // 4ª Prioridade: Se a venda tiver um nome já gravado diferente do padrão
-    if (venda.vendedorNome && venda.vendedorNome !== 'Caixa/PDV' && venda.vendedorNome !== 'Caixa / PDV' && venda.vendedorNome !== 'Caixa / Balcão') {
+    // Acessa o nome legado do banco de dados (ignorando nomes padrões inúteis)
+    if (venda.vendedorNome && typeof venda.vendedorNome === 'string' && !['Caixa/PDV', 'Sistema', 'Caixa / Balcão'].includes(venda.vendedorNome)) {
        return String(venda.vendedorNome);
     }
 
-    // 5ª Prioridade: O nome que ficou gravado nos logs automáticos do passado
     if (vendedorMapLogs.has(venda.id)) return String(vendedorMapLogs.get(venda.id));
     
-    // Fallback final garantido
     return 'Caixa / PDV';
   };
   // =========================================================================================
@@ -409,8 +403,7 @@ export default function DashboardPage() {
   }).sort((a: any, b: any) => b.totalGasto - a.totalGasto); 
 
   const historicoAuditoria: any[] = [];
-  const idsVendasNosLogs = new Set<number>();
-
+  
   logs.filter((log: any) => log.categoria === 'produto' || log.categoria === 'venda').forEach((log: any) => {
     let textoDescricao = log.descricao;
     const descLower = textoDescricao.toLowerCase();
@@ -420,8 +413,6 @@ export default function DashboardPage() {
     const match = textoDescricao.match(/Cupom #(\d+)/i);
     if (match) {
       const vendaId = Number(match[1]);
-      idsVendasNosLogs.add(vendaId);
-      
       const vendaRelacionada = listaVendas.find((v: any) => v.id === vendaId);
       if (vendaRelacionada && !textoDescricao.includes('via') && !textoDescricao.startsWith('[CORRECAO')) {
         const pag = formatarPagamentoTabela(vendaRelacionada.formaPagamento);
@@ -435,7 +426,7 @@ export default function DashboardPage() {
     } else if (descLower.includes('retornaram') || descLower.includes('adicionado') || descLower.includes('desmanchado')) {
       tipoBadge = "📈 ENTRADA (RETORNO)";
       corBadge = "bg-green-50 text-green-700 border-green-200";
-    } else if (descLower.startsWith('[correcao_vendedor]')) {
+    } else if (descLower.startsWith('[CORRECAO_VENDEDOR]')) {
       tipoBadge = "✏️ AUDITORIA";
       corBadge = "bg-amber-50 text-amber-700 border-amber-200";
     }
@@ -451,7 +442,7 @@ export default function DashboardPage() {
   });
 
   listaVendas.forEach((v: any) => {
-    if (!idsVendasNosLogs.has(v.id)) {
+    if (!vendedorMapLogs.has(v.id) && !correcoesManuaisLogs.has(v.id) && !v.idVendedor) {
       const pag = formatarPagamentoTabela(v.formaPagamento);
       const vendedorRetroativo = getNomeExibicaoVendedor(v);
       
@@ -604,7 +595,6 @@ export default function DashboardPage() {
                       <td className={`p-3 text-sm font-black ${venda.status === 'cancelada' ? 'text-zinc-400 line-through' : 'text-green-600'}`}>{exibirMoeda(venda.total)}</td>
                       <td className="p-3 text-xs font-bold text-zinc-500 uppercase">{formatarPagamentoTabela(venda.formaPagamento)}</td>
                       
-                      {/* 🚀 BOTÃO DE CORREÇÃO MANUAL DO VENDEDOR (Agora grava na nuvem sem erros) */}
                       <td 
                         className="p-3 text-xs font-bold text-zinc-600 truncate max-w-[120px] cursor-pointer hover:text-blue-600 group" 
                         title="Clique para corrigir o nome do vendedor desta venda"
