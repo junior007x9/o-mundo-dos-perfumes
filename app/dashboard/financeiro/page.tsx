@@ -9,6 +9,9 @@ export default function FinanceiroPage() {
   const [listaDespesas, setListaDespesas] = useState<any[]>([]);
   const [carregando, setCarregando] = useState(true);
 
+  // 🚀 NOVO: ESTADO GLOBAL DO MÊS SELECIONADO (Inicia no mês atual)
+  const [mesSelecionado, setMesSelecionado] = useState(() => new Date().toISOString().slice(0, 7));
+
   // Estados do formulário
   const [descDespesa, setDescDespesa] = useState('');
   const [valorDespesa, setValorDespesa] = useState('');
@@ -47,34 +50,158 @@ export default function FinanceiroPage() {
 
   const formataMoeda = (valor: number) => valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-  // LÓGICA DE CÁLCULO FINANCEIRO
-  const dataHoje = new Date();
-  const mesAtual = dataHoje.toISOString().slice(0, 7);
-
+  // ============================================================================
+  // 🚀 LÓGICA DE CÁLCULO FINANCEIRO (Agora conectada ao Filtro de Mês!)
+  // ============================================================================
+  
   // 1. Receitas (Faturamento)
   const faturamentoTotal = listaVendas.reduce((acc, v) => acc + v.total, 0);
-  const faturamentoMes = listaVendas.filter(v => v.data.startsWith(mesAtual)).reduce((acc, v) => acc + v.total, 0);
+  const faturamentoMes = listaVendas.filter(v => v.data.startsWith(mesSelecionado)).reduce((acc, v) => acc + v.total, 0);
 
   // 2. Despesas
   const despesasTotal = listaDespesas.reduce((acc, d) => acc + d.valor, 0);
-  const despesasMes = listaDespesas.filter(d => d.data.startsWith(mesAtual)).reduce((acc, d) => acc + d.valor, 0);
+  const despesasMes = listaDespesas.filter(d => d.data.startsWith(mesSelecionado)).reduce((acc, d) => acc + d.valor, 0);
 
   // 3. Lucro Líquido
   const lucroTotal = faturamentoTotal - despesasTotal;
   const lucroMes = faturamentoMes - despesasMes;
+
+  // Filtra as despesas da tabela para o mês escolhido
+  const despesasFiltradas = listaDespesas.filter(d => d.data.startsWith(mesSelecionado));
+
+  // ============================================================================
+  // 🚀 EXPORTAÇÃO INTELIGENTE PARA O FINANCEIRO
+  // ============================================================================
+  const exportarParaExcel = () => {
+    const dataEmissao = new Date().toLocaleString('pt-BR');
+    
+    let csvCompleto = "\uFEFF"; 
+    csvCompleto += "O MUNDO DOS PERFUMES\nRELATÓRIO FINANCEIRO GERENCIAL\n";
+    csvCompleto += `Mês de Referência: ${mesSelecionado.split('-').reverse().join('/')}\n`;
+    csvCompleto += `Data de Emissão: ${dataEmissao}\n\n`;
+    
+    csvCompleto += "--- RESUMO DO MÊS ---\n";
+    csvCompleto += `Faturamento (Entradas);${faturamentoMes.toFixed(2).replace('.', ',')}\n`;
+    csvCompleto += `Despesas (Saídas);${despesasMes.toFixed(2).replace('.', ',')}\n`;
+    csvCompleto += `LUCRO LÍQUIDO;${lucroMes.toFixed(2).replace('.', ',')}\n\n`;
+
+    csvCompleto += "--- DETALHAMENTO DE DESPESAS ---\n";
+    csvCompleto += "Data;Descrição;Categoria;Valor da Despesa (R$)\n";
+
+    despesasFiltradas.forEach((d: any) => {
+      const dData = new Date(d.data).toLocaleDateString('pt-BR');
+      const dValor = d.valor.toFixed(2).replace('.', ',');
+      csvCompleto += `${dData};${d.descricao};${d.categoria};${dValor}\n`;
+    });
+
+    const blob = new Blob([csvCompleto], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `relatorio_financeiro_${mesSelecionado}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportarParaPDF = () => {
+    const popup = window.open('', '_blank', 'width=850,height=1000');
+    if (!popup) return alert('Por favor, autorize pop-ups no seu navegador para emitir o PDF!');
+
+    const dataEmissao = new Date().toLocaleString('pt-BR');
+
+    const linhasTabela = despesasFiltradas.map((d: any) => {
+      return `<tr><td>${new Date(d.data).toLocaleDateString('pt-BR')}</td><td><strong>${d.descricao}</strong></td><td>${d.categoria}</td><td class="right bold text-red">- ${formataMoeda(d.valor)}</td></tr>`;
+    }).join('');
+
+    popup.document.write(`
+      <html>
+        <head>
+          <title>Relatório Financeiro</title>
+          <style>
+            @page { size: A4; margin: 15mm 12mm; } body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #2d3748; margin: 0; padding: 0; font-size: 10.5pt; }
+            .header { border-bottom: 3px solid #6A283A; padding-bottom: 12px; margin-bottom: 25px; display: table; width: 100%; } .header-left { display: table-cell; vertical-align: bottom; } .header-right { display: table-cell; text-align: right; vertical-align: bottom; font-size: 9pt; color: #718096; } .header-left h1 { color: #6A283A; margin: 0; font-size: 24pt; font-weight: 900; }
+            
+            .resumo-tabela { width: 100%; margin-bottom: 30px; border-collapse: separate; border-spacing: 15px 0; }
+            .resumo-card { border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; background-color: #f8fafc; }
+            .resumo-card h3 { margin: 0 0 5px 0; font-size: 9pt; color: #718096; text-transform: uppercase; }
+            .resumo-card p { margin: 0; font-size: 16pt; font-weight: 900; }
+            
+            .text-blue { color: #2b6cb0; } .text-red { color: #c53030; } .text-green { color: #2f855a; }
+            
+            table.lista { width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 9.5pt; } 
+            table.lista th { background: #6A283A; color: #ffffff; padding: 10px 12px; font-weight: 700; text-transform: uppercase; font-size: 8pt; text-align: left; } 
+            table.lista td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+            .right { text-align: right; } .bold { font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="header-left">
+              <h1>O MUNDO DOS PERFUMES</h1>
+              <p style="margin: 5px 0 0 0; font-size: 12pt; font-weight: bold; color: #4a5568;">Relatório Gerencial Financeiro</p>
+            </div>
+            <div class="header-right">
+              <p>Mês Base: <strong>${mesSelecionado.split('-').reverse().join('/')}</strong></p>
+              <p>Data de Emissão: <strong>${dataEmissao}</strong></p>
+            </div>
+          </div>
+          
+          <table class="resumo-tabela">
+            <tr>
+              <td class="resumo-card" style="border-left: 4px solid #3182ce;">
+                <h3>Faturamento (Entradas)</h3>
+                <p class="text-blue">${formataMoeda(faturamentoMes)}</p>
+              </td>
+              <td class="resumo-card" style="border-left: 4px solid #e53e3e;">
+                <h3>Despesas (Saídas)</h3>
+                <p class="text-red">${formataMoeda(despesasMes)}</p>
+              </td>
+              <td class="resumo-card" style="border-left: 4px solid ${lucroMes >= 0 ? '#38a169' : '#e53e3e'};">
+                <h3>Lucro Líquido do Mês</h3>
+                <p class="${lucroMes >= 0 ? 'text-green' : 'text-red'}">${formataMoeda(lucroMes)}</p>
+              </td>
+            </tr>
+          </table>
+
+          <h3 style="color: #2d3748; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 15px;">Detalhamento de Despesas (${mesSelecionado.split('-').reverse().join('/')})</h3>
+          
+          ${despesasFiltradas.length > 0 ? `
+            <table class="lista">
+              <thead><tr><th style="width: 15%;">Data</th><th style="width: 45%;">Descrição</th><th style="width: 25%;">Categoria</th><th style="width: 15%;" class="right">Valor</th></tr></thead>
+              <tbody>${linhasTabela}</tbody>
+            </table>
+          ` : '<p style="color: #a0aec0; padding: 20px 0; text-align: center; font-style: italic;">Nenhuma despesa lançada neste mês de referência.</p>'}
+        </body>
+      </html>
+    `);
+    popup.document.close();
+  };
 
   if (carregando) return <div className="p-8 text-center text-[#6A283A] font-bold animate-pulse">Carregando painel financeiro...</div>;
 
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
       
-      <div>
-        <h2 className="text-2xl font-black text-[#6A283A] flex items-center gap-2">📈 Controle Financeiro</h2>
-        <p className="text-zinc-500 text-sm font-medium mt-1">Registe as suas despesas e descubra o seu Lucro Líquido real.</p>
+      {/* CABEÇALHO COM FILTRO DE MÊS */}
+      <div className="flex flex-col md:flex-row justify-between md:items-end gap-4 border-b border-zinc-200 pb-6">
+        <div>
+          <h2 className="text-2xl font-black text-[#6A283A] flex items-center gap-2">📈 Controle Financeiro</h2>
+          <p className="text-zinc-500 text-sm font-medium mt-1">Registe as suas despesas e descubra o seu Lucro Líquido real.</p>
+        </div>
+        <div className="flex items-center gap-2 bg-white px-4 py-2.5 rounded-xl border border-[#E0DDDD] shadow-sm w-full md:w-auto">
+          <span className="text-lg">📅</span>
+          <input 
+            type="month" 
+            value={mesSelecionado} 
+            onChange={(e) => setMesSelecionado(e.target.value)}
+            className="bg-transparent text-sm font-black text-[#6A283A] outline-none cursor-pointer w-full"
+          />
+        </div>
       </div>
 
-      {/* CARDS RESUMO DO MÊS */}
-      <h3 className="text-lg font-black text-zinc-700 border-b border-zinc-200 pb-2">📅 Resumo deste Mês</h3>
+      {/* CARDS RESUMO DO MÊS SELECIONADO */}
+      <h3 className="text-lg font-black text-zinc-700">Resumo de {mesSelecionado.split('-').reverse().join('/')}</h3>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-blue-500 shadow-sm">
           <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Faturamento (Entradas)</h3>
@@ -156,9 +283,15 @@ export default function FinanceiroPage() {
           </div>
         </div>
 
-        {/* TABELA DE DESPESAS */}
+        {/* TABELA DE DESPESAS COM BOTÕES DE EXPORTAÇÃO */}
         <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] flex flex-col">
-          <h2 className="text-xl font-bold text-zinc-800 mb-4">Histórico de Saídas</h2>
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-4">
+            <h2 className="text-xl font-bold text-zinc-800">Histórico de Saídas ({mesSelecionado.split('-').reverse().join('/')})</h2>
+            <div className="flex items-center gap-2">
+              <button onClick={exportarParaExcel} className="bg-green-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm hover:bg-green-800 transition">📥 Excel</button>
+              <button onClick={exportarParaPDF} className="bg-[#6A283A] text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm hover:bg-[#521e2d] transition">📄 PDF</button>
+            </div>
+          </div>
           
           <div className="overflow-x-auto rounded-lg border border-[#E0DDDD]/60 flex-1 max-h-[500px] overflow-y-auto">
             <table className="w-full text-left whitespace-nowrap">
@@ -172,7 +305,7 @@ export default function FinanceiroPage() {
                 </tr>
               </thead>
               <tbody>
-                {listaDespesas.map((despesa) => (
+                {despesasFiltradas.map((despesa) => (
                   <tr key={despesa.id} className="border-b border-[#E0DDDD]/50 hover:bg-red-50/30 transition-colors">
                     <td className="p-3 text-sm text-zinc-600">{new Date(despesa.data).toLocaleDateString('pt-BR')}</td>
                     <td className="p-3 text-sm font-bold text-zinc-800">{despesa.descricao}</td>
@@ -183,8 +316,8 @@ export default function FinanceiroPage() {
                     </td>
                   </tr>
                 ))}
-                {listaDespesas.length === 0 && (
-                  <tr><td colSpan={5} className="p-8 text-center text-zinc-500">Nenhuma despesa registada ainda.</td></tr>
+                {despesasFiltradas.length === 0 && (
+                  <tr><td colSpan={5} className="p-8 text-center text-zinc-500">Nenhuma despesa registada neste mês.</td></tr>
                 )}
               </tbody>
             </table>
