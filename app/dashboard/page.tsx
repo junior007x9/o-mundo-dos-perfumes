@@ -18,6 +18,9 @@ export default function DashboardPage() {
   const [abaAtiva, setAbaAtiva] = useState('geral');
   const [ocultarValores, setOcultarValores] = useState(false);
 
+  // 🚀 NOVO: ESTADO GLOBAL DO MÊS SELECIONADO (Inicia no mês atual)
+  const [mesSelecionado, setMesSelecionado] = useState(() => new Date().toISOString().slice(0, 7));
+
   const [vendedoresManuais, setVendedoresManuais] = useState<Record<number, string>>({});
 
   const [metaLoja, setMetaLoja] = useState<number>(50000); 
@@ -58,7 +61,6 @@ export default function DashboardPage() {
   const salvarVendedorManual = async (idVenda: number, atual: string) => {
     const nome = prompt(`Correção Definitiva de Venda Antiga:\n\nDigite o nome correto de quem fez esta venda (Ex: Izabel, carolina flores, Junior loka):`, atual);
     if (nome && nome.trim() !== "" && nome.trim() !== atual) {
-      
       const novos = { ...vendedoresManuais, [idVenda]: nome.trim() };
       setVendedoresManuais(novos);
       localStorage.setItem('vendedoresRetroativosMundoPerfumes', JSON.stringify(novos));
@@ -114,7 +116,6 @@ export default function DashboardPage() {
     if (telefone && !telefone.startsWith('55') && telefone.length >= 10) {
       telefone = '55' + telefone;
     }
-    
     let texto = `*O MUNDO DOS PERFUMES* 🛍️\n\nOlá, *${nomeCliente}*, tudo bem?\n\n`;
     if (diasUltimaCompra > 60) {
       texto += `Faz um tempinho que você não nos visita! Chegaram várias novidades e fragrâncias incríveis na loja. Quer conferir o nosso catálogo novo com um desconto especial? ✨`;
@@ -152,9 +153,6 @@ export default function DashboardPage() {
   const formataMoeda = (valor: number) => valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const exibirMoeda = (valor: number) => ocultarValores ? 'R$ •••••' : formataMoeda(valor);
 
-  // =========================================================================================
-  // 🚀 LÓGICA INFALÍVEL DE RESGATE DE VENDEDORES (Blindada para TypeScript)
-  // =========================================================================================
   const vendedorMapLogs = new Map<number, string>();
   const correcoesManuaisLogs = new Map<number, string>();
 
@@ -182,13 +180,11 @@ export default function DashboardPage() {
     if (correcoesManuaisLogs.has(venda.id)) return String(correcoesManuaisLogs.get(venda.id));
     if (vendedoresManuais[venda.id]) return String(vendedoresManuais[venda.id]);
     
-    // 🚀 TENTA CRUZAR COM A LISTA DA TABELA 'vendedores'
     if (venda.idVendedor && dados?.listaUsuarios) {
       const u = dados.listaUsuarios.find((x: any) => Number(x.id) === Number(venda.idVendedor));
       if (u && u.nome) return String(u.nome);
     }
     
-    // Acessa o nome legado do banco de dados (ignorando nomes padrões inúteis)
     if (venda.vendedorNome && typeof venda.vendedorNome === 'string' && !['Caixa/PDV', 'Sistema', 'Caixa / Balcão'].includes(venda.vendedorNome)) {
        return String(venda.vendedorNome);
     }
@@ -196,76 +192,6 @@ export default function DashboardPage() {
     if (vendedorMapLogs.has(venda.id)) return String(vendedorMapLogs.get(venda.id));
     
     return 'Caixa / PDV';
-  };
-  // =========================================================================================
-
-  const exportarParaExcel = () => {
-    if (!dados || !dados.listaVendas || dados.listaVendas.length === 0) return;
-    const vendasValidasRelatorio = dados.listaVendas.filter((v: any) => v.status !== 'cancelada');
-    const totalRelatorio = vendasValidasRelatorio.reduce((acc: number, v: any) => acc + v.total, 0);
-    const dataEmissao = new Date().toLocaleString('pt-BR');
-    
-    let csvCompleto = "\uFEFF"; 
-    csvCompleto += "O MUNDO DOS PERFUMES\nRELATÓRIO GERENCIAL DE VENDAS\n";
-    csvCompleto += `Data de Emissão: ${dataEmissao}\n\n`;
-    csvCompleto += "Código do Cupom;Data e Hora;Vendedor;Forma de Pagamento;Status da Venda;Valor da Venda (R$)\n";
-
-    dados.listaVendas.forEach((v: any) => {
-      const idCupom = `#${v.id}`;
-      const dataHora = new Date(v.data).toLocaleString('pt-BR');
-      const vendedorStr = getNomeExibicaoVendedor(v);
-      const pagamentoStr = v.formaPagamento ? v.formaPagamento.toUpperCase() : 'DINHEIRO';
-      const statusStr = v.status === 'cancelada' ? 'CANCELADA' : 'CONCLUÍDA';
-      const valorStr = v.total.toFixed(2).replace('.', ',');
-      csvCompleto += `${idCupom};${dataHora};${vendedorStr};${pagamentoStr};${statusStr};${valorStr}\n`;
-    });
-    csvCompleto += `\n;;;;TOTAL FATURADO LÍQUIDO:;${totalRelatorio.toFixed(2).replace('.', ',')}\n`;
-
-    const blob = new Blob([csvCompleto], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `relatorio_vendas_mundo_perfumes_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const exportarParaPDF = () => {
-    if (!dados || !dados.listaVendas || dados.listaVendas.length === 0) return;
-    const popup = window.open('', '_blank', 'width=850,height=1000');
-    if (!popup) return alert('Por favor, autorize pop-ups no seu navegador para emitir o PDF!');
-
-    const vendasValidasRelatorio = dados.listaVendas.filter((v: any) => v.status !== 'cancelada');
-    const totalRelatorio = vendasValidasRelatorio.reduce((acc: number, v: any) => acc + v.total, 0);
-    const dataEmissao = new Date().toLocaleString('pt-BR');
-
-    const linhasTabela = dados.listaVendas.map((v: any) => {
-      const statusClasse = v.status === 'cancelada' ? 'status-cancelada' : 'status-concluida';
-      const statusTexto = v.status === 'cancelada' ? 'CANCELADA' : 'CONCLUÍDA';
-      const valorClasse = v.status === 'cancelada' ? 'valor-cancelado' : 'valor-concluido';
-      const vendedorStr = getNomeExibicaoVendedor(v);
-      return `<tr class="${v.status === 'cancelada' ? 'linha-cancelada' : ''}"><td><strong>#${v.id}</strong></td><td>${new Date(v.data).toLocaleString('pt-BR')}</td><td>${vendedorStr}</td><td>${formatarPagamentoTabela(v.formaPagamento)}</td><td><span class="status-badge ${statusClasse}">${statusTexto}</span></td><td class="right bold ${valorClasse}">${formataMoeda(v.total)}</td></tr>`;
-    }).join('');
-
-    popup.document.write(`
-      <html>
-        <head>
-          <title>Relatório de Vendas</title>
-          <style>
-            @page { size: A4; margin: 15mm 12mm; } body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #2d3748; margin: 0; padding: 0; font-size: 10.5pt; }
-            .header { border-bottom: 3px solid #6A283A; padding-bottom: 12px; margin-bottom: 25px; display: table; width: 100%; } .header-left { display: table-cell; vertical-align: bottom; } .header-right { display: table-cell; text-align: right; vertical-align: bottom; font-size: 9pt; color: #718096; } .header-left h1 { color: #6A283A; margin: 0; font-size: 24pt; font-weight: 900; }
-            table { width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 9.5pt; } th { background: #6A283A; color: #ffffff; padding: 10px 12px; font-weight: 700; text-transform: uppercase; font-size: 8pt; text-align: left; } td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
-            .status-badge { padding: 3px 8px; font-size: 7.5pt; font-weight: 800; border-radius: 4px; } .status-concluida { background-color: #c6f6d5; color: #22543d; } .status-cancelada { background-color: #fed7d7; color: #742a2a; } .right { text-align: right; } .bold { font-weight: bold; } .total-row td { border-top: 2px solid #6A283A; color: #6A283A; padding: 14px 12px; }
-          </style>
-        </head>
-        <body>
-          <div class="header"><div class="header-left"><h1>O MUNDO DOS PERFUMES</h1></div><div class="header-right"><p>Data: <strong>${dataEmissao}</strong></p></div></div>
-          <table><thead><tr><th style="width: 10%;">Cupom</th><th style="width: 20%;">Data e Hora</th><th style="width: 15%;">Vendedor</th><th style="width: 25%;">Forma de Pagamento</th><th style="width: 15%;">Status</th><th style="width: 15%;" class="right">Valor Líquido</th></tr></thead><tbody>${linhasTabela}<tr class="total-row bold"><td colspan="4"></td><td>TOTAL LÍQUIDO:</td><td class="right">${formataMoeda(totalRelatorio)}</td></tr></tbody></table>
-        </body>
-      </html>
-    `);
-    popup.document.close();
   };
 
   const dispararImpressaoEtiqueta = (produto: any) => {
@@ -310,11 +236,12 @@ export default function DashboardPage() {
   const listaItens = dados?.listaItens || [];
 
   const dataHoje = new Date().toISOString().split('T')[0];
-  const mesAtual = new Date().toISOString().slice(0, 7);
   
   const vendasValidas = listaVendas.filter((v: any) => v.status !== 'cancelada');
   const vendasHoje = vendasValidas.filter((v: any) => v.data && v.data.startsWith(dataHoje));
-  const vendasMes = vendasValidas.filter((v: any) => v.data && v.data.startsWith(mesAtual));
+  
+  // 🚀 A MÁGICA DO FILTRO: Todas as vendas filtradas pelo MÊS SELECIONADO!
+  const vendasMes = vendasValidas.filter((v: any) => v.data && v.data.startsWith(mesSelecionado));
 
   const totalVendidoHoje = vendasHoje.reduce((acc: number, v: any) => acc + v.total, 0);
   const totalVendidoMes = vendasMes.reduce((acc: number, v: any) => acc + v.total, 0);
@@ -353,7 +280,7 @@ export default function DashboardPage() {
   }
 
   const idsVendasValidas = new Set(vendasValidas.map((v: any) => v.id));
-  const idsVendasMes = new Set(vendasMes.map((v: any) => v.id));
+  const idsVendasMes = new Set(vendasMes.map((v: any) => v.id)); // 🚀 O CMV já respeita o filtro!
   const custoProdutoMap = new Map<number, number>(listaProdutos.map((p: any) => [Number(p.id), Number(p.precoCusto || 0)]));
 
   let custoMercadoriaTotal = 0;
@@ -380,8 +307,9 @@ export default function DashboardPage() {
   const valorPotencialAlcancado = listaProdutos.reduce((acc: number, p: any) => acc + (Number(p.precoVenda || 0) * Number(p.estoque || 0)), 0);
   const capitalInvestidoEstoque = listaProdutos.reduce((acc: number, p: any) => acc + (Number(p.precoCusto || 0) * (p.estoque > 0 ? Number(p.estoque) : 0)), 0);
 
+  // 🚀 O Financeiro (Despesas) também respeita o Mês Selecionado
   const despesasOperacionaisMes = listaDespesas
-    .filter((d: any) => d.categoria !== 'Estoque / Mercadoria' && d.data && d.data.startsWith(mesAtual))
+    .filter((d: any) => d.categoria !== 'Estoque / Mercadoria' && d.data && d.data.startsWith(mesSelecionado))
     .reduce((acc: number, d: any) => acc + Number(d.valor || 0), 0);
 
   const despesasOperacionaisTotal = listaDespesas
@@ -426,7 +354,7 @@ export default function DashboardPage() {
     } else if (descLower.includes('retornaram') || descLower.includes('adicionado') || descLower.includes('desmanchado')) {
       tipoBadge = "📈 ENTRADA (RETORNO)";
       corBadge = "bg-green-50 text-green-700 border-green-200";
-    } else if (descLower.startsWith('[CORRECAO_VENDEDOR]')) {
+    } else if (descLower.startsWith('[correcao_vendedor]')) {
       tipoBadge = "✏️ AUDITORIA";
       corBadge = "bg-amber-50 text-amber-700 border-amber-200";
     }
@@ -477,6 +405,80 @@ export default function DashboardPage() {
 
   historicoAuditoria.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
 
+
+  // =========================================================================================
+  // 🚀 EXPORTAÇÃO INTELIGENTE (Agora só exporta as vendas do Mês Selecionado!)
+  // =========================================================================================
+  const exportarParaExcel = () => {
+    if (!vendasMes || vendasMes.length === 0) return alert('Nenhuma venda neste mês para exportar.');
+    const vendasValidasRelatorio = vendasMes; // Já estão filtradas as não-canceladas pelo state vendasMes
+    const totalRelatorio = vendasValidasRelatorio.reduce((acc: number, v: any) => acc + v.total, 0);
+    const dataEmissao = new Date().toLocaleString('pt-BR');
+    
+    let csvCompleto = "\uFEFF"; 
+    csvCompleto += "O MUNDO DOS PERFUMES\nRELATÓRIO GERENCIAL DE VENDAS\n";
+    csvCompleto += `Mês de Referência: ${mesSelecionado.split('-').reverse().join('/')}\n`;
+    csvCompleto += `Data de Emissão: ${dataEmissao}\n\n`;
+    csvCompleto += "Código do Cupom;Data e Hora;Vendedor;Forma de Pagamento;Status da Venda;Valor da Venda (R$)\n";
+
+    vendasMes.forEach((v: any) => {
+      const idCupom = `#${v.id}`;
+      const dataHora = new Date(v.data).toLocaleString('pt-BR');
+      const vendedorStr = getNomeExibicaoVendedor(v);
+      const pagamentoStr = v.formaPagamento ? v.formaPagamento.toUpperCase() : 'DINHEIRO';
+      const statusStr = v.status === 'cancelada' ? 'CANCELADA' : 'CONCLUÍDA';
+      const valorStr = v.total.toFixed(2).replace('.', ',');
+      csvCompleto += `${idCupom};${dataHora};${vendedorStr};${pagamentoStr};${statusStr};${valorStr}\n`;
+    });
+    csvCompleto += `\n;;;;TOTAL FATURADO LÍQUIDO:;${totalRelatorio.toFixed(2).replace('.', ',')}\n`;
+
+    const blob = new Blob([csvCompleto], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `relatorio_vendas_mundo_perfumes_${mesSelecionado}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportarParaPDF = () => {
+    if (!vendasMes || vendasMes.length === 0) return alert('Nenhuma venda neste mês para exportar.');
+    const popup = window.open('', '_blank', 'width=850,height=1000');
+    if (!popup) return alert('Por favor, autorize pop-ups no seu navegador para emitir o PDF!');
+
+    const vendasValidasRelatorio = vendasMes;
+    const totalRelatorio = vendasValidasRelatorio.reduce((acc: number, v: any) => acc + v.total, 0);
+    const dataEmissao = new Date().toLocaleString('pt-BR');
+
+    const linhasTabela = vendasMes.map((v: any) => {
+      const statusClasse = v.status === 'cancelada' ? 'status-cancelada' : 'status-concluida';
+      const statusTexto = v.status === 'cancelada' ? 'CANCELADA' : 'CONCLUÍDA';
+      const valorClasse = v.status === 'cancelada' ? 'valor-cancelado' : 'valor-concluido';
+      const vendedorStr = getNomeExibicaoVendedor(v);
+      return `<tr class="${v.status === 'cancelada' ? 'linha-cancelada' : ''}"><td><strong>#${v.id}</strong></td><td>${new Date(v.data).toLocaleString('pt-BR')}</td><td>${vendedorStr}</td><td>${formatarPagamentoTabela(v.formaPagamento)}</td><td><span class="status-badge ${statusClasse}">${statusTexto}</span></td><td class="right bold ${valorClasse}">${formataMoeda(v.total)}</td></tr>`;
+    }).join('');
+
+    popup.document.write(`
+      <html>
+        <head>
+          <title>Relatório de Vendas</title>
+          <style>
+            @page { size: A4; margin: 15mm 12mm; } body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #2d3748; margin: 0; padding: 0; font-size: 10.5pt; }
+            .header { border-bottom: 3px solid #6A283A; padding-bottom: 12px; margin-bottom: 25px; display: table; width: 100%; } .header-left { display: table-cell; vertical-align: bottom; } .header-right { display: table-cell; text-align: right; vertical-align: bottom; font-size: 9pt; color: #718096; } .header-left h1 { color: #6A283A; margin: 0; font-size: 24pt; font-weight: 900; }
+            table { width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 9.5pt; } th { background: #6A283A; color: #ffffff; padding: 10px 12px; font-weight: 700; text-transform: uppercase; font-size: 8pt; text-align: left; } td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+            .status-badge { padding: 3px 8px; font-size: 7.5pt; font-weight: 800; border-radius: 4px; } .status-concluida { background-color: #c6f6d5; color: #22543d; } .status-cancelada { background-color: #fed7d7; color: #742a2a; } .right { text-align: right; } .bold { font-weight: bold; } .total-row td { border-top: 2px solid #6A283A; color: #6A283A; padding: 14px 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="header"><div class="header-left"><h1>O MUNDO DOS PERFUMES</h1></div><div class="header-right"><p>Mês Base: <strong>${mesSelecionado.split('-').reverse().join('/')}</strong></p><p>Emissão: <strong>${dataEmissao}</strong></p></div></div>
+          <table><thead><tr><th style="width: 10%;">Cupom</th><th style="width: 20%;">Data e Hora</th><th style="width: 15%;">Vendedor</th><th style="width: 25%;">Forma de Pagamento</th><th style="width: 15%;">Status</th><th style="width: 15%;" class="right">Valor Líquido</th></tr></thead><tbody>${linhasTabela}<tr class="total-row bold"><td colspan="4"></td><td>TOTAL LÍQUIDO:</td><td class="right">${formataMoeda(totalRelatorio)}</td></tr></tbody></table>
+        </body>
+      </html>
+    `);
+    popup.document.close();
+  };
+
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
       
@@ -488,12 +490,25 @@ export default function DashboardPage() {
             <p className="text-zinc-600 text-sm mt-0.5 font-medium">Controle de carteira (CRM), P&L, comissões, fluxo de mercadoria e rotulagem em um só lugar.</p>
           </div>
         </div>
-        <button 
-          onClick={handleAlternarPrivacidade}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-black transition-all shadow-sm ${ocultarValores ? 'bg-zinc-800 text-white' : 'bg-white border border-[#E0DDDD] text-zinc-600 hover:bg-zinc-50'}`}
-        >
-          {ocultarValores ? '👁️ Mostrar Valores' : '🙈 Ocultar Valores'}
-        </button>
+        
+        {/* 🚀 NOVO: GESTOR DE MÊS / MÁQUINA DO TEMPO */}
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-2 bg-white px-3 py-2.5 rounded-xl border border-[#E0DDDD] shadow-sm flex-1 sm:flex-none">
+            <span className="text-lg">📅</span>
+            <input 
+              type="month" 
+              value={mesSelecionado} 
+              onChange={(e) => setMesSelecionado(e.target.value)}
+              className="bg-transparent text-sm font-black text-[#6A283A] outline-none cursor-pointer w-full"
+            />
+          </div>
+          <button 
+            onClick={handleAlternarPrivacidade}
+            className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-black transition-all shadow-sm flex-1 sm:flex-none ${ocultarValores ? 'bg-zinc-800 text-white' : 'bg-white border border-[#E0DDDD] text-zinc-600 hover:bg-zinc-50'}`}
+          >
+            {ocultarValores ? '👁️ Valores' : '🙈 Ocultar'}
+          </button>
+        </div>
       </div>
 
       <div className="flex overflow-x-auto gap-2 border-b border-zinc-200 pb-px scrollbar-none">
@@ -523,7 +538,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-[#A56877] flex flex-col justify-between">
-              <div><h3 className="text-xs font-bold text-zinc-500 uppercase">Faturamento Mês</h3><p className="text-2xl font-black text-[#A56877] mt-2">{exibirMoeda(totalVendidoMes)}</p></div>
+              <div><h3 className="text-xs font-bold text-zinc-500 uppercase">Faturamento ({mesSelecionado.split('-').reverse().join('/')})</h3><p className="text-2xl font-black text-[#A56877] mt-2">{exibirMoeda(totalVendidoMes)}</p></div>
               <div className="mt-4 pt-3 border-t border-zinc-100 grid grid-cols-2 gap-2 text-[10px] font-bold text-zinc-500 text-center">
                 <div className="bg-zinc-50 p-1.5 rounded">💵 {exibirMoeda(mesDinheiro)}</div>
                 <div className="bg-zinc-50 p-1.5 rounded">💠 {exibirMoeda(mesPix)}</div>
@@ -550,7 +565,7 @@ export default function DashboardPage() {
             <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E0DDDD] border-l-4 border-l-orange-500 flex flex-col justify-between">
               <div>
                 <h3 className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-1 cursor-help" title="Custo das Mercadorias Vendidas. Valor de compra de todos os produtos que já foram vendidos.">
-                  Custos (CMV) Mês ℹ️
+                  Custos (CMV) {mesSelecionado.split('-').reverse().join('/')} ℹ️
                 </h3>
                 <p className="text-2xl font-black text-orange-600 mt-2">{exibirMoeda(custoMercadoriaMes)}</p>
                 <p className="text-[9px] text-zinc-400 mt-1 leading-tight">Valor bruto de custo investido apenas nas mercadorias que já saíram do estoque.</p>
@@ -570,7 +585,7 @@ export default function DashboardPage() {
 
           <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD]">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-4">
-              <h2 className="text-xl font-bold text-[#6A283A]">Histórico de Vendas</h2>
+              <h2 className="text-xl font-bold text-[#6A283A]">Histórico de Vendas ({mesSelecionado.split('-').reverse().join('/')})</h2>
               <div className="flex items-center gap-2">
                 <button onClick={exportarParaExcel} className="bg-green-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm">📥 Excel</button>
                 <button onClick={exportarParaPDF} className="bg-[#6A283A] text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm">📄 PDF</button>
@@ -589,7 +604,8 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {listaVendas.map((venda: any) => (
+                  {/* 🚀 AGORA MOSTRA APENAS AS VENDAS DO MÊS SELECIONADO NO FILTRO LÁ EM CIMA */}
+                  {vendasMes.map((venda: any) => (
                     <tr key={venda.id} className={`border-b border-[#E0DDDD]/50 transition-colors ${venda.status === 'cancelada' ? 'bg-red-50/50' : ''}`}>
                       <td className="p-3 text-sm text-zinc-600">{new Date(venda.data).toLocaleString('pt-BR')}</td>
                       <td className={`p-3 text-sm font-black ${venda.status === 'cancelada' ? 'text-zinc-400 line-through' : 'text-green-600'}`}>{exibirMoeda(venda.total)}</td>
@@ -614,6 +630,11 @@ export default function DashboardPage() {
                       </td>
                     </tr>
                   ))}
+                  {vendasMes.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-zinc-400 font-medium">Nenhuma venda registada em {mesSelecionado.split('-').reverse().join('/')}.</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -626,6 +647,7 @@ export default function DashboardPage() {
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300">
           <div className="mb-4">
             <h2 className="text-xl font-black text-purple-700">📑 Monitoramento Dinâmico de Contas a Receber</h2>
+            <p className="text-zinc-500 text-xs">Exibe todos os pendentes ativos, independente do mês.</p>
           </div>
           <div className="overflow-x-auto rounded-lg border border-[#E0DDDD]">
             <table className="w-full text-left whitespace-nowrap">
@@ -672,7 +694,7 @@ export default function DashboardPage() {
               <h2 className="text-xl font-black text-amber-600 flex items-center gap-2">
                 <span>🔍</span> Registro Oficial de Auditoria de Estoque
               </h2>
-              <p className="text-zinc-500 text-sm mt-0.5">Histórico imutável completo desde o primeiro dia do sistema.</p>
+              <p className="text-zinc-500 text-sm mt-0.5">Mostrando as movimentações de: <strong>{mesSelecionado.split('-').reverse().join('/')}</strong>.</p>
             </div>
             <span className="bg-amber-100 text-amber-800 text-[11px] font-black px-3 py-1 rounded-md uppercase border border-amber-200">
               Segurança Total
@@ -690,7 +712,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 font-semibold text-sm">
-                {historicoAuditoria.map((auditoria: any) => (
+                {historicoAuditoria.filter(a => a.data.startsWith(mesSelecionado)).map((auditoria: any) => (
                   <tr key={auditoria.id} className="hover:bg-zinc-50/60 transition-colors">
                     <td className="p-3 text-zinc-500 font-mono text-xs">
                       {new Date(auditoria.data).toLocaleString('pt-BR')}
@@ -708,10 +730,10 @@ export default function DashboardPage() {
                     </td>
                   </tr>
                 ))}
-                {historicoAuditoria.length === 0 && (
+                {historicoAuditoria.filter(a => a.data.startsWith(mesSelecionado)).length === 0 && (
                   <tr>
                     <td colSpan={4} className="p-8 text-center text-zinc-400 font-medium">
-                      Nenhuma movimentação física registrada.
+                      Nenhuma movimentação física registrada neste mês.
                     </td>
                   </tr>
                 )}
@@ -766,7 +788,8 @@ export default function DashboardPage() {
           <div><h2 className="text-xl font-black text-blue-700">🧮 Demonstrativo de Resultados (DRE)</h2></div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="border border-zinc-200 rounded-xl p-4 bg-zinc-50">
-              <h3 className="font-black text-sm uppercase text-zinc-700 border-b pb-2 mb-4">📅 Mês Atual</h3>
+              {/* 🚀 O DRE AGORA ACOMPANHA O MÊS SELECIONADO NO FILTRO */}
+              <h3 className="font-black text-sm uppercase text-zinc-700 border-b pb-2 mb-4">Mês Selecionado ({mesSelecionado.split('-').reverse().join('/')})</h3>
               <div className="space-y-3 font-semibold text-sm">
                 <div className="flex justify-between text-zinc-600"><span>(+) Receita Bruta</span><span className="font-black text-zinc-800">{exibirMoeda(totalVendidoMes)}</span></div>
                 <div className="flex justify-between text-orange-600 border-b pb-2"><span>(-) Custo Mercadoria (CMV)</span><span className="font-black">({exibirMoeda(custoMercadoriaMes)})</span></div>
@@ -776,7 +799,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="border border-zinc-200 rounded-xl p-4 bg-zinc-50">
-              <h3 className="font-black text-sm uppercase text-zinc-700 border-b pb-2 mb-4">🌍 Histórico Total</h3>
+              <h3 className="font-black text-sm uppercase text-zinc-700 border-b pb-2 mb-4">🌍 Histórico Total (Todos os meses)</h3>
               <div className="space-y-3 font-semibold text-sm">
                 <div className="flex justify-between text-zinc-600"><span>(+) Receita Acumulada</span><span className="font-black text-zinc-800">{exibirMoeda(totalVendidoSempre)}</span></div>
                 <div className="flex justify-between text-orange-600 border-b pb-2"><span>(-) Custo Total (CMV)</span><span className="font-black">({exibirMoeda(custoMercadoriaTotal)})</span></div>
@@ -823,7 +846,7 @@ export default function DashboardPage() {
       {abaAtiva === 'comissoes' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300">
           <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-4 mb-6">
-            <div><h2 className="text-xl font-black text-amber-600">🎖️ Metas e Comissões</h2></div>
+            <div><h2 className="text-xl font-black text-amber-600">🎖️ Metas e Comissões ({mesSelecionado.split('-').reverse().join('/')})</h2></div>
             <div className="flex gap-3">
               <div><label className="block text-[10px] font-black text-zinc-500 uppercase mb-1">Meta Loja (R$)</label><input type="number" value={metaLoja} onChange={(e) => setMetaLoja(Number(e.target.value) || 1)} className="p-2 border border-zinc-300 rounded-lg text-sm font-black w-32 outline-none focus:border-amber-500" /></div>
               <div><label className="block text-[10px] font-black text-zinc-500 uppercase mb-1">Comissão (%)</label><input type="number" value={taxaComissao} onChange={(e) => setTaxaComissao(Number(e.target.value) || 0)} className="p-2 border border-zinc-300 rounded-lg text-sm font-black w-24 outline-none focus:border-amber-500" /></div>
