@@ -2,7 +2,6 @@
 'use server'
 
 import { db } from '@/db';
-// 🚀 CORRIGIDO: A tabela chama-se "vendedores" e não "usuarios"
 import { vendas, produtos, clientes, itensVenda, logsSistema, vendedores } from '@/db/schema';
 import { desc, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
@@ -17,7 +16,6 @@ export async function getDadosDashboard() {
   const listaClientes = await db.select().from(clientes);
   const listaItens = await db.select().from(itensVenda);
 
-  // 🚀 CRUCIAL: Busca a lista da tabela correta 'vendedores'
   let listaUsuarios: any[] = [];
   try {
     listaUsuarios = await db.select().from(vendedores);
@@ -37,34 +35,47 @@ export async function getDadosDashboard() {
     listaProdutos, 
     listaClientes, 
     listaItens,
-    listaUsuarios, // Agora enviamos a lista para o ecrã do Dashboard!
+    listaUsuarios, 
     logs,
     idVendedorLogado: usuario?.id || 0,
     cargoVendedor: usuario?.cargo || 'vendedor'
   };
 }
 
+// 🚀 LÓGICA DE ESTORNO ATUALIZADA: Agora grava a matemática exata do estoque
 export async function cancelarVendaAction(idVenda: number) {
   const usu = await getUsuarioLogado();
   const nomeUsuario = usu?.nome || 'Sistema';
 
   const itens = await db.select().from(itensVenda).where(eq(itensVenda.idVenda, idVenda));
 
+  let logsDetalhesEstorno: string[] = [];
+
   for (const item of itens) {
     const resProduto = await db.select().from(produtos).where(eq(produtos.id, item.idProduto)).limit(1);
     const produtoAtual = resProduto[0];
     
     if (produtoAtual) {
+      const estoqueAntigo = produtoAtual.estoque;
+      const quantidadeDevolvida = item.quantidade;
+      const novoEstoque = estoqueAntigo + quantidadeDevolvida;
+
       await db.update(produtos)
-        .set({ estoque: produtoAtual.estoque + item.quantidade })
+        .set({ estoque: novoEstoque })
         .where(eq(produtos.id, item.idProduto));
+      
+      // Armazena a contagem para mostrar na auditoria
+      logsDetalhesEstorno.push(`[${produtoAtual.nome}: Tinha ${estoqueAntigo} ➡️ Voltou +${quantidadeDevolvida} ➡️ Agora ${novoEstoque}]`);
     }
   }
 
   await db.update(vendas).set({ status: 'cancelada' }).where(eq(vendas.id, idVenda));
 
+  // Junta todos os produtos que voltaram na mesma frase
+  const detalheLog = logsDetalhesEstorno.length > 0 ? logsDetalhesEstorno.join(' | ') : 'Nenhum produto rastreável';
+
   await db.insert(logsSistema).values({
-    descricao: `🔄 Venda #${idVenda} estornada com sucesso. Os produtos retornaram ao estoque.`,
+    descricao: `🔄 Venda #${idVenda} estornada com sucesso. Estoque restaurado: ${detalheLog}`,
     data: new Date().toISOString(),
     categoria: 'venda',
     usuarioNome: nomeUsuario 
