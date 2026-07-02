@@ -87,9 +87,19 @@ export default async function ProdutosPage({
     };
 
     if (id) {
+      // Pega o estoque antigo para informar na Auditoria
+      const prodAntigo = await db.select().from(produtos).where(eq(produtos.id, Number(id))).limit(1);
+      const estoqueAntigo = prodAntigo[0]?.estoque || 0;
+
       await db.update(produtos).set(dados).where(eq(produtos.id, Number(id)));
+
+      let msgLog = `✏️ Produto editado: "${dados.nome}".`;
+      if (estoqueAntigo !== dados.estoque) {
+        msgLog += ` Estoque ajustado: [Tinha ${estoqueAntigo} ➡️ Agora ${dados.estoque}]`;
+      }
+
       await db.insert(logsSistema).values({
-        descricao: `Produto editado: "${dados.nome}" atualizado.`,
+        descricao: msgLog,
         data: new Date().toISOString(),
         categoria: 'produto',
         usuarioNome: nomeUsuario
@@ -97,7 +107,7 @@ export default async function ProdutosPage({
     } else {
       await db.insert(produtos).values(dados);
       await db.insert(logsSistema).values({
-        descricao: `Novo produto adicionado: "${dados.nome}".`,
+        descricao: `➕ Novo produto cadastrado: "${dados.nome}". [Estoque Inicial: ${dados.estoque}]`,
         data: new Date().toISOString(),
         categoria: 'produto',
         usuarioNome: nomeUsuario
@@ -107,7 +117,7 @@ export default async function ProdutosPage({
     redirect('/dashboard/produtos?msg=Produto guardado com sucesso no estoque!');
   }
 
-  // 🚀 LÓGICA DE EXCLUSÃO CORRIGIDA E BLINDADA
+  // 🚀 LÓGICA DE EXCLUSÃO DE KITS CORRIGIDA E DETALHADA PARA A AUDITORIA
   async function excluirProduto(formData: FormData) {
     'use server';
     const usu = await getUsuarioLogado();
@@ -123,38 +133,45 @@ export default async function ProdutosPage({
     if (resProd.length > 0) {
       const produtoApagado = resProd[0];
 
-      // Se for um KIT, desmembra os produtos devolvendo as quantidades ao estoque
       if (produtoApagado.nome.startsWith('🎁 Kit:')) {
-        // Formato esperado da descrição do kit: "Contém: Perfume X, Sabonete Y"
         const descKit = produtoApagado.descricao || '';
         const prefixoDesc = 'Contém: ';
         
         if (descKit.startsWith(prefixoDesc)) {
-          const nomesDosItens = descKit.substring(prefixoDesc.length).split(', ').map(n => n.trim());
+          const itensString = descKit.substring(prefixoDesc.length);
+          // 🚀 Agora reconhece o novo separador ' | ' que é muito mais seguro que a vírgula
+          const separador = itensString.includes(' | ') ? ' | ' : ', ';
+          const nomesDosItens = itensString.split(separador).map(n => n.trim());
           
-          // Busca todos os produtos ativos cujos nomes estejam nessa lista
           const listaAtual = await db.select().from(produtos);
+          let logsDetalhesKit: string[] = [];
           
           for (const nomeItem of nomesDosItens) {
             const prodAlvo = listaAtual.find(p => p.nome === nomeItem);
             if (prodAlvo) {
-              // Devolve a quantidade total de kits em estoque para os itens individuais
+              const estoqueAntigo = prodAlvo.estoque;
+              const quantidadeDevolvida = produtoApagado.estoque;
+              const novoEstoque = estoqueAntigo + quantidadeDevolvida;
+
               await db.update(produtos)
-                .set({ estoque: prodAlvo.estoque + produtoApagado.estoque })
+                .set({ estoque: novoEstoque })
                 .where(eq(produtos.id, prodAlvo.id));
+              
+              // 🚀 Registra a matemática explícita para o cliente ver!
+              logsDetalhesKit.push(`[${prodAlvo.nome}: Tinha ${estoqueAntigo} ➡️ Voltou +${quantidadeDevolvida} ➡️ Agora ${novoEstoque}]`);
             }
           }
+          
+          await db.insert(logsSistema).values({
+            descricao: `♻️ Kit Desmanchado: "${produtoApagado.nome}". Estoque restaurado: ${logsDetalhesKit.join(' | ')}`,
+            data: new Date().toISOString(),
+            categoria: 'produto',
+            usuarioNome: nomeUsuario
+          });
         }
-        
-        await db.insert(logsSistema).values({
-          descricao: `♻️ Kit desmanchado e excluído: "${produtoApagado.nome}". Os itens internos retornaram ao estoque.`,
-          data: new Date().toISOString(),
-          categoria: 'produto',
-          usuarioNome: nomeUsuario
-        });
       } else {
         await db.insert(logsSistema).values({
-          descricao: `🗑️ Produto excluído permanentemente: "${produtoApagado.nome}".`,
+          descricao: `🗑️ Produto excluído permanentemente: "${produtoApagado.nome}" (Tinha ${produtoApagado.estoque} un. no estoque).`,
           data: new Date().toISOString(),
           categoria: 'produto',
           usuarioNome: nomeUsuario
@@ -168,6 +185,7 @@ export default async function ProdutosPage({
     redirect('/dashboard/produtos?msg=Item apagado e estoque reorganizado com sucesso!');
   }
 
+  // 🚀 LÓGICA DE MONTAGEM DE KITS COM MATEMÁTICA EXPLÍCITA
   async function montarKit(formData: FormData) {
     'use server';
     const usu = await getUsuarioLogado();
@@ -193,27 +211,35 @@ export default async function ProdutosPage({
 
     let custoTotal = 0;
     const nomesItens = [];
+    let logsDetalhesMontagem: string[] = [];
 
     for (const item of itens) {
       custoTotal += Number(item.precoCusto) * qtdKits;
       nomesItens.push(item.nome);
       
+      const estoqueAntigo = item.estoque;
+      const novoEstoque = item.estoque - qtdKits;
+
       await db.update(produtos)
-        .set({ estoque: item.estoque - qtdKits })
+        .set({ estoque: novoEstoque })
         .where(eq(produtos.id, item.id));
+
+      // 🚀 Matemática explícita da saída
+      logsDetalhesMontagem.push(`[${item.nome}: Tinha ${estoqueAntigo} ➡️ Saiu -${qtdKits} ➡️ Agora ${novoEstoque}]`);
     }
 
     await db.insert(produtos).values({
       codigoBarras: `KIT-${Date.now().toString().slice(-6)}`,
       nome: `🎁 Kit: ${nomeKit}`,
-      descricao: `Contém: ${nomesItens.join(', ')}`,
+      // 🚀 Trocamos para " | " no lugar da vírgula para evitar erros na hora de desmanchar
+      descricao: `Contém: ${nomesItens.join(' | ')}`,
       precoCusto: custoTotal,
       precoVenda: precoVendaKit,
       estoque: qtdKits,
     });
 
     await db.insert(logsSistema).values({
-      descricao: `🎁 Kit Promocional montado: "${nomeKit}" (${qtdKits} un.).`,
+      descricao: `🎁 Kit "${nomeKit}" montado (${qtdKits} un.). Estoque reduzido: ${logsDetalhesMontagem.join(' | ')}`,
       data: new Date().toISOString(),
       categoria: 'produto',
       usuarioNome: nomeUsuario

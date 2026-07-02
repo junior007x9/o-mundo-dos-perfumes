@@ -410,7 +410,6 @@ export default function CaixaPage() {
   }
 
   return (
-    // 🚀 LÓGICA DE ALTURA AJUSTADA: Solta a trava no telemóvel para permitir scroll total!
     <div className="flex flex-col gap-3 md:gap-4 lg:h-[calc(100vh-5rem)] xl:h-[calc(100vh-6rem)] lg:overflow-hidden pb-10 lg:pb-0">
       
       {modalCliente && (
@@ -503,14 +502,18 @@ export default function CaixaPage() {
         </div>
       )}
 
-      {/* BARRA DE PESQUISA MAIS LARGA NO TELEMÓVEL */}
+      {/* 🚀 CORREÇÃO 1: BARRA DE PESQUISA COM O ÍCONE BEM SEPARADO DO TEXTO */}
       <div className="flex-shrink-0 bg-white p-2 md:p-3 rounded-xl shadow-sm border border-[#E0DDDD] flex gap-2">
         <div className="relative flex-1">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-lg">🔍</span>
+          {/* Ícone fixo de fundo */}
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <span className="text-zinc-400 text-lg">🔍</span>
+          </div>
           <input 
             ref={inputBuscaRef} type="text" value={buscaTexto} onChange={(e) => setBuscaTexto(e.target.value)}
             placeholder="Buscar por nome, marca, código..."
-            className="w-full pl-10 p-3 md:p-3 border border-[#E0DDDD] rounded-lg focus:ring-2 focus:ring-[#6A283A] outline-none font-bold text-sm md:text-base transition-all"
+            // Aumentamos o padding-left (pl-12) para que o texto só comece depois da lupa
+            className="w-full pl-12 pr-4 py-3 md:py-3 border border-[#E0DDDD] rounded-lg focus:ring-2 focus:ring-[#6A283A] outline-none font-bold text-sm md:text-base transition-all"
             autoFocus
           />
         </div>
@@ -521,7 +524,6 @@ export default function CaixaPage() {
 
       <div className="flex flex-col lg:flex-row gap-4 lg:flex-1 lg:min-h-0 lg:overflow-hidden">
         
-        {/* 🚀 CATÁLOGO COM ALTURA FIXA NO MOBILE PARA NÃO EMPURRAR O CARRINHO */}
         <div className="bg-white flex flex-col rounded-xl shadow-sm border border-[#E0DDDD] h-[35vh] lg:h-auto lg:flex-1 lg:min-h-0 lg:overflow-hidden">
           <div className="flex-shrink-0 flex justify-between items-center p-3 border-b border-[#E0DDDD] bg-zinc-50">
             <h2 className="text-lg font-black text-[#6A283A]">Catálogo Rápido</h2>
@@ -549,7 +551,6 @@ export default function CaixaPage() {
           </div>
         </div>
 
-        {/* 🚀 CARRINHO LIVRE PARA CRESCER NO MOBILE */}
         <div className="w-full lg:w-[380px] xl:w-[420px] bg-zinc-50 flex flex-col rounded-xl shadow-xl lg:shadow-none border border-[#E0DDDD] lg:flex-shrink-0 lg:min-h-0 lg:overflow-hidden mb-6 lg:mb-0">
           
           <div className="flex-shrink-0 bg-[#6A283A] text-white p-3 flex justify-between items-center shadow-md rounded-t-xl">
@@ -557,7 +558,6 @@ export default function CaixaPage() {
             <span className="bg-white text-[#6A283A] font-black px-2 py-0.5 rounded text-xs">{carrinho.length} Itens</span>
           </div>
           
-          {/* LISTA DE ITENS DO CARRINHO (Com altura máxima de segurança) */}
           <div className="overflow-y-auto p-2 space-y-2 bg-white min-h-[120px] max-h-[25vh] lg:max-h-none lg:flex-1">
             {carrinho.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-zinc-400 p-4 text-center py-8">
@@ -580,7 +580,6 @@ export default function CaixaPage() {
             )}
           </div>
 
-          {/* 🚀 FORMULÁRIO DE PAGAMENTO (Botões maiores no mobile) */}
           <div className="flex-shrink-0 bg-white border-t-2 border-zinc-200 p-4 lg:p-3 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] rounded-b-xl">
             
             <div className="grid grid-cols-2 gap-3 lg:gap-2 mb-3 lg:mb-2">
@@ -681,7 +680,6 @@ export default function CaixaPage() {
                 {Number(desconto) > 0 && <span className="text-[10px] lg:text-[9px] text-zinc-400 line-through mt-1 lg:mt-0.5">{formataMoeda(totalCompra)}</span>}
               </div>
 
-              {/* BOTÃO FINALIZAR GIGANTE NO MOBILE */}
               <button 
                 onClick={handleFinalizarVenda} 
                 disabled={botaoDesabilitado || processandoVenda} 
