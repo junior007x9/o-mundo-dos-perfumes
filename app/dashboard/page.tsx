@@ -18,7 +18,7 @@ export default function DashboardPage() {
   const [abaAtiva, setAbaAtiva] = useState('geral');
   const [ocultarValores, setOcultarValores] = useState(false);
 
-  // 🚀 NOVO: ESTADO GLOBAL DO MÊS SELECIONADO (Inicia no mês atual)
+  // ESTADO GLOBAL DO MÊS SELECIONADO
   const [mesSelecionado, setMesSelecionado] = useState(() => new Date().toISOString().slice(0, 7));
 
   const [vendedoresManuais, setVendedoresManuais] = useState<Record<number, string>>({});
@@ -239,12 +239,11 @@ export default function DashboardPage() {
   
   const vendasValidas = listaVendas.filter((v: any) => v.status !== 'cancelada');
   const vendasHoje = vendasValidas.filter((v: any) => v.data && v.data.startsWith(dataHoje));
-  
-  // 🚀 A MÁGICA DO FILTRO: Todas as vendas filtradas pelo MÊS SELECIONADO!
-  const vendasMes = vendasValidas.filter((v: any) => v.data && v.data.startsWith(mesSelecionado));
+  const vendasMes = listaVendas.filter((v: any) => v.data && v.data.startsWith(mesSelecionado)); // TODAS DO MÊS (Inclui Canceladas para o Relatório PDF)
+  const vendasValidasMes = vendasValidas.filter((v: any) => v.data && v.data.startsWith(mesSelecionado)); // SÓ AS VÁLIDAS DO MÊS (Para Gráficos)
 
   const totalVendidoHoje = vendasHoje.reduce((acc: number, v: any) => acc + v.total, 0);
-  const totalVendidoMes = vendasMes.reduce((acc: number, v: any) => acc + v.total, 0);
+  const totalVendidoMes = vendasValidasMes.reduce((acc: number, v: any) => acc + v.total, 0);
   const totalVendidoSempre = vendasValidas.reduce((acc: number, v: any) => acc + v.total, 0);
   
   const obterPagamento = (v: any) => String(v.formaPagamento || '').toLowerCase();
@@ -254,13 +253,13 @@ export default function DashboardPage() {
   const hojeCredito = vendasHoje.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'credito', v.total), 0);
   const hojeDebito = vendasHoje.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'debito', v.total), 0);
 
-  const mesDinheiro = vendasMes.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'dinheiro', v.total), 0);
-  const mesPix = vendasMes.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'pix', v.total), 0);
-  const mesCredito = vendasMes.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'credito', v.total), 0);
-  const mesDebito = vendasMes.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'debito', v.total), 0);
+  const mesDinheiro = vendasValidasMes.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'dinheiro', v.total), 0);
+  const mesPix = vendasValidasMes.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'pix', v.total), 0);
+  const mesCredito = vendasValidasMes.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'credito', v.total), 0);
+  const mesDebito = vendasValidasMes.reduce((acc: number, v: any) => acc + obterValorPorForma(v.formaPagamento, 'debito', v.total), 0);
 
   const hojeVendaDireta = vendasHoje.filter((v: any) => obterPagamento(v).startsWith('venda_direta') && !obterPagamento(v).includes('pago=true')).reduce((acc: number, v: any) => acc + v.total, 0);
-  const mesVendaDireta = vendasMes.filter((v: any) => obterPagamento(v).startsWith('venda_direta') && !obterPagamento(v).includes('pago=true')).reduce((acc: number, v: any) => acc + v.total, 0);
+  const mesVendaDireta = vendasValidasMes.filter((v: any) => obterPagamento(v).startsWith('venda_direta') && !obterPagamento(v).includes('pago=true')).reduce((acc: number, v: any) => acc + v.total, 0);
   const totalVendaDiretaSempre = vendasValidas.filter((v: any) => obterPagamento(v).startsWith('venda_direta') && !obterPagamento(v).includes('pago=true')).reduce((acc: number, v: any) => acc + v.total, 0);
 
   function obterValorPorForma(forma: string, tipo: string, totalVenda: number) {
@@ -280,7 +279,7 @@ export default function DashboardPage() {
   }
 
   const idsVendasValidas = new Set(vendasValidas.map((v: any) => v.id));
-  const idsVendasMes = new Set(vendasMes.map((v: any) => v.id)); // 🚀 O CMV já respeita o filtro!
+  const idsVendasMes = new Set(vendasValidasMes.map((v: any) => v.id));
   const custoProdutoMap = new Map<number, number>(listaProdutos.map((p: any) => [Number(p.id), Number(p.precoCusto || 0)]));
 
   let custoMercadoriaTotal = 0;
@@ -307,7 +306,6 @@ export default function DashboardPage() {
   const valorPotencialAlcancado = listaProdutos.reduce((acc: number, p: any) => acc + (Number(p.precoVenda || 0) * Number(p.estoque || 0)), 0);
   const capitalInvestidoEstoque = listaProdutos.reduce((acc: number, p: any) => acc + (Number(p.precoCusto || 0) * (p.estoque > 0 ? Number(p.estoque) : 0)), 0);
 
-  // 🚀 O Financeiro (Despesas) também respeita o Mês Selecionado
   const despesasOperacionaisMes = listaDespesas
     .filter((d: any) => d.categoria !== 'Estoque / Mercadoria' && d.data && d.data.startsWith(mesSelecionado))
     .reduce((acc: number, d: any) => acc + Number(d.valor || 0), 0);
@@ -405,13 +403,12 @@ export default function DashboardPage() {
 
   historicoAuditoria.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
 
-
   // =========================================================================================
-  // 🚀 EXPORTAÇÃO INTELIGENTE (Agora só exporta as vendas do Mês Selecionado!)
+  // 🚀 EXPORTAÇÃO EXCEL
   // =========================================================================================
   const exportarParaExcel = () => {
     if (!vendasMes || vendasMes.length === 0) return alert('Nenhuma venda neste mês para exportar.');
-    const vendasValidasRelatorio = vendasMes; // Já estão filtradas as não-canceladas pelo state vendasMes
+    const vendasValidasRelatorio = vendasMes.filter((v: any) => v.status !== 'cancelada');
     const totalRelatorio = vendasValidasRelatorio.reduce((acc: number, v: any) => acc + v.total, 0);
     const dataEmissao = new Date().toLocaleString('pt-BR');
     
@@ -442,37 +439,237 @@ export default function DashboardPage() {
     document.body.removeChild(link);
   };
 
+  // =========================================================================================
+  // 🚀 NOVO: EXPORTAÇÃO PDF SUPER PROFISSIONAL E ESTILIZADA
+  // =========================================================================================
   const exportarParaPDF = () => {
     if (!vendasMes || vendasMes.length === 0) return alert('Nenhuma venda neste mês para exportar.');
-    const popup = window.open('', '_blank', 'width=850,height=1000');
+    const popup = window.open('', '_blank', 'width=900,height=1000');
     if (!popup) return alert('Por favor, autorize pop-ups no seu navegador para emitir o PDF!');
 
-    const vendasValidasRelatorio = vendasMes;
-    const totalRelatorio = vendasValidasRelatorio.reduce((acc: number, v: any) => acc + v.total, 0);
+    const vendasValidasRelatorio = vendasMes.filter((v: any) => v.status !== 'cancelada');
+    const vendasCanceladasRelatorio = vendasMes.filter((v: any) => v.status === 'cancelada');
+
+    const totalBruto = vendasMes.reduce((acc: number, v: any) => acc + v.total, 0);
+    const totalCancelado = vendasCanceladasRelatorio.reduce((acc: number, v: any) => acc + v.total, 0);
+    const totalLiquido = vendasValidasRelatorio.reduce((acc: number, v: any) => acc + v.total, 0);
+
     const dataEmissao = new Date().toLocaleString('pt-BR');
+    const mesNome = mesSelecionado.split('-').reverse().join('/');
 
     const linhasTabela = vendasMes.map((v: any) => {
       const statusClasse = v.status === 'cancelada' ? 'status-cancelada' : 'status-concluida';
       const statusTexto = v.status === 'cancelada' ? 'CANCELADA' : 'CONCLUÍDA';
       const valorClasse = v.status === 'cancelada' ? 'valor-cancelado' : 'valor-concluido';
       const vendedorStr = getNomeExibicaoVendedor(v);
-      return `<tr class="${v.status === 'cancelada' ? 'linha-cancelada' : ''}"><td><strong>#${v.id}</strong></td><td>${new Date(v.data).toLocaleString('pt-BR')}</td><td>${vendedorStr}</td><td>${formatarPagamentoTabela(v.formaPagamento)}</td><td><span class="status-badge ${statusClasse}">${statusTexto}</span></td><td class="right bold ${valorClasse}">${formataMoeda(v.total)}</td></tr>`;
+      const dataStr = new Date(v.data).toLocaleString('pt-BR');
+      const pagamentoStr = formatarPagamentoTabela(v.formaPagamento);
+      
+      return `
+        <tr class="${v.status === 'cancelada' ? 'linha-cancelada' : ''}">
+          <td><strong>#${v.id}</strong></td>
+          <td>${dataStr}</td>
+          <td>${vendedorStr}</td>
+          <td>${pagamentoStr}</td>
+          <td style="text-align: center;"><span class="status-badge ${statusClasse}">${statusTexto}</span></td>
+          <td class="right bold ${valorClasse}">${formataMoeda(v.total)}</td>
+        </tr>
+      `;
     }).join('');
 
     popup.document.write(`
+      <!DOCTYPE html>
       <html>
         <head>
-          <title>Relatório de Vendas</title>
+          <title>Relatório de Vendas - ${mesNome}</title>
           <style>
-            @page { size: A4; margin: 15mm 12mm; } body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #2d3748; margin: 0; padding: 0; font-size: 10.5pt; }
-            .header { border-bottom: 3px solid #6A283A; padding-bottom: 12px; margin-bottom: 25px; display: table; width: 100%; } .header-left { display: table-cell; vertical-align: bottom; } .header-right { display: table-cell; text-align: right; vertical-align: bottom; font-size: 9pt; color: #718096; } .header-left h1 { color: #6A283A; margin: 0; font-size: 24pt; font-weight: 900; }
-            table { width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 9.5pt; } th { background: #6A283A; color: #ffffff; padding: 10px 12px; font-weight: 700; text-transform: uppercase; font-size: 8pt; text-align: left; } td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
-            .status-badge { padding: 3px 8px; font-size: 7.5pt; font-weight: 800; border-radius: 4px; } .status-concluida { background-color: #c6f6d5; color: #22543d; } .status-cancelada { background-color: #fed7d7; color: #742a2a; } .right { text-align: right; } .bold { font-weight: bold; } .total-row td { border-top: 2px solid #6A283A; color: #6A283A; padding: 14px 12px; }
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+            @page { size: A4; margin: 10mm; }
+            body { 
+              font-family: 'Inter', sans-serif; 
+              color: #334155; 
+              margin: 0; 
+              padding: 20px; 
+              font-size: 10pt; 
+              background: #f8fafc;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .container {
+              background: #fff;
+              padding: 30px;
+              border-radius: 12px;
+              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            }
+            .header { 
+              display: flex; 
+              justify-content: space-between; 
+              align-items: flex-start;
+              border-bottom: 3px solid #6A283A; 
+              padding-bottom: 15px; 
+              margin-bottom: 20px; 
+            }
+            .header-left h1 { 
+              color: #6A283A; 
+              margin: 0 0 5px 0; 
+              font-size: 22pt; 
+              font-weight: 900;
+              text-transform: uppercase;
+              letter-spacing: -0.5px;
+            }
+            .header-left p {
+              margin: 0;
+              color: #64748b;
+              font-size: 11pt;
+              font-weight: 600;
+            }
+            .header-right { 
+              text-align: right; 
+              font-size: 9pt; 
+              color: #94a3b8; 
+            }
+            .header-right strong { color: #475569; }
+            
+            /* Resumo Cards */
+            .resumo-container {
+              display: flex;
+              gap: 15px;
+              margin-bottom: 25px;
+            }
+            .card {
+              flex: 1;
+              padding: 15px;
+              border-radius: 8px;
+              border: 1px solid #e2e8f0;
+              background: #f8fafc;
+            }
+            .card-title {
+              font-size: 8pt;
+              text-transform: uppercase;
+              font-weight: 700;
+              color: #64748b;
+              margin-bottom: 5px;
+            }
+            .card-value {
+              font-size: 16pt;
+              font-weight: 900;
+            }
+            .val-bruto { color: #0f172a; }
+            .val-cancelado { color: #ef4444; }
+            .val-liquido { color: #10b981; }
+
+            /* Tabela */
+            table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin-top: 10px; 
+              font-size: 9pt; 
+            }
+            th { 
+              background: #6A283A; 
+              color: #ffffff; 
+              padding: 12px; 
+              font-weight: 700; 
+              text-transform: uppercase; 
+              font-size: 8pt; 
+              text-align: left;
+              border: 1px solid #6A283A;
+            }
+            td { 
+              padding: 10px 12px; 
+              border-bottom: 1px solid #e2e8f0; 
+              vertical-align: middle; 
+            }
+            tr:nth-child(even) { background-color: #f8fafc; }
+            .linha-cancelada td { opacity: 0.6; background-color: #fef2f2; }
+            .valor-cancelado { text-decoration: line-through; color: #ef4444 !important; }
+            
+            /* Badges */
+            .status-badge { 
+              padding: 4px 8px; 
+              font-size: 7.5pt; 
+              font-weight: 800; 
+              border-radius: 6px; 
+              display: inline-block;
+            }
+            .status-concluida { background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+            .status-cancelada { background-color: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+            
+            .right { text-align: right; } 
+            .bold { font-weight: bold; } 
+            
+            .total-row td { 
+              border-top: 2px solid #6A283A; 
+              background: #fdf2f5;
+              color: #6A283A; 
+              padding: 15px 12px; 
+              font-size: 11pt;
+            }
+
+            @media print {
+              body { background: #fff; padding: 0; }
+              .container { box-shadow: none; border: none; padding: 0; }
+            }
           </style>
         </head>
         <body>
-          <div class="header"><div class="header-left"><h1>O MUNDO DOS PERFUMES</h1></div><div class="header-right"><p>Mês Base: <strong>${mesSelecionado.split('-').reverse().join('/')}</strong></p><p>Emissão: <strong>${dataEmissao}</strong></p></div></div>
-          <table><thead><tr><th style="width: 10%;">Cupom</th><th style="width: 20%;">Data e Hora</th><th style="width: 15%;">Vendedor</th><th style="width: 25%;">Forma de Pagamento</th><th style="width: 15%;">Status</th><th style="width: 15%;" class="right">Valor Líquido</th></tr></thead><tbody>${linhasTabela}<tr class="total-row bold"><td colspan="4"></td><td>TOTAL LÍQUIDO:</td><td class="right">${formataMoeda(totalRelatorio)}</td></tr></tbody></table>
+          <div class="container">
+            <div class="header">
+              <div class="header-left">
+                <h1>O MUNDO DOS PERFUMES</h1>
+                <p>Relatório Gerencial de Vendas</p>
+              </div>
+              <div class="header-right">
+                <p>Mês Base: <strong>${mesNome}</strong></p>
+                <p>Emitido em: <strong>${dataEmissao}</strong></p>
+              </div>
+            </div>
+            
+            <div class="resumo-container">
+              <div class="card" style="border-left: 4px solid #94a3b8;">
+                <div class="card-title">Faturamento Bruto</div>
+                <div class="card-value val-bruto">${formataMoeda(totalBruto)}</div>
+              </div>
+              <div class="card" style="border-left: 4px solid #ef4444;">
+                <div class="card-title">Devoluções / Cancelados</div>
+                <div class="card-value val-cancelado">${formataMoeda(totalCancelado)}</div>
+              </div>
+              <div class="card" style="border-left: 4px solid #10b981; background: #ecfdf5;">
+                <div class="card-title" style="color: #047857;">Total Líquido</div>
+                <div class="card-value val-liquido">${formataMoeda(totalLiquido)}</div>
+              </div>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 10%;">Cupom</th>
+                  <th style="width: 18%;">Data e Hora</th>
+                  <th style="width: 17%;">Vendedor</th>
+                  <th style="width: 25%;">Forma de Pagamento</th>
+                  <th style="width: 15%; text-align: center;">Status</th>
+                  <th style="width: 15%;" class="right">Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${linhasTabela}
+                <tr class="total-row bold">
+                  <td colspan="5" class="right">TOTAL LÍQUIDO DO MÊS:</td>
+                  <td class="right">${formataMoeda(totalLiquido)}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div style="text-align: center; margin-top: 30px; font-size: 8pt; color: #94a3b8;">
+              Relatório gerado automaticamente pelo sistema O Mundo dos Perfumes.
+            </div>
+          </div>
+          <script>
+            window.onload = function() { 
+              setTimeout(() => {
+                window.print(); 
+              }, 300);
+            }
+          </script>
         </body>
       </html>
     `);
@@ -491,7 +688,6 @@ export default function DashboardPage() {
           </div>
         </div>
         
-        {/* 🚀 NOVO: GESTOR DE MÊS / MÁQUINA DO TEMPO */}
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <div className="flex items-center gap-2 bg-white px-3 py-2.5 rounded-xl border border-[#E0DDDD] shadow-sm flex-1 sm:flex-none">
             <span className="text-lg">📅</span>
@@ -604,7 +800,6 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {/* 🚀 AGORA MOSTRA APENAS AS VENDAS DO MÊS SELECIONADO NO FILTRO LÁ EM CIMA */}
                   {vendasMes.map((venda: any) => (
                     <tr key={venda.id} className={`border-b border-[#E0DDDD]/50 transition-colors ${venda.status === 'cancelada' ? 'bg-red-50/50' : ''}`}>
                       <td className="p-3 text-sm text-zinc-600">{new Date(venda.data).toLocaleString('pt-BR')}</td>
@@ -788,7 +983,6 @@ export default function DashboardPage() {
           <div><h2 className="text-xl font-black text-blue-700">🧮 Demonstrativo de Resultados (DRE)</h2></div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="border border-zinc-200 rounded-xl p-4 bg-zinc-50">
-              {/* 🚀 O DRE AGORA ACOMPANHA O MÊS SELECIONADO NO FILTRO */}
               <h3 className="font-black text-sm uppercase text-zinc-700 border-b pb-2 mb-4">Mês Selecionado ({mesSelecionado.split('-').reverse().join('/')})</h3>
               <div className="space-y-3 font-semibold text-sm">
                 <div className="flex justify-between text-zinc-600"><span>(+) Receita Bruta</span><span className="font-black text-zinc-800">{exibirMoeda(totalVendidoMes)}</span></div>
