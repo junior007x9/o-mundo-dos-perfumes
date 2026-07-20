@@ -18,7 +18,6 @@ export default function DashboardPage() {
   const [abaAtiva, setAbaAtiva] = useState('geral');
   const [ocultarValores, setOcultarValores] = useState(false);
 
-  // ESTADO GLOBAL DO MÊS SELECIONADO
   const [mesSelecionado, setMesSelecionado] = useState(() => new Date().toISOString().slice(0, 7));
 
   const [vendedoresManuais, setVendedoresManuais] = useState<Record<number, string>>({});
@@ -235,12 +234,22 @@ export default function DashboardPage() {
   const listaClientes = dados?.listaClientes || [];
   const listaItens = dados?.listaItens || [];
 
+  // 🚀 LÓGICA MÁGICA: Buscar os itens de cada venda para mostrar na tabela!
+  const getItensDaVenda = (idVenda: number) => {
+    const itens = listaItens.filter((i: any) => i.idVenda === idVenda);
+    if (itens.length === 0) return 'Itens não encontrados (Antigos)';
+    return itens.map((i: any) => {
+      const prod = listaProdutos.find((p: any) => p.id === i.idProduto);
+      return `${i.quantidade}x ${prod ? prod.nome : 'Produto (Excluído)'}`;
+    }).join(' • ');
+  };
+
   const dataHoje = new Date().toISOString().split('T')[0];
   
   const vendasValidas = listaVendas.filter((v: any) => v.status !== 'cancelada');
   const vendasHoje = vendasValidas.filter((v: any) => v.data && v.data.startsWith(dataHoje));
-  const vendasMes = listaVendas.filter((v: any) => v.data && v.data.startsWith(mesSelecionado)); // TODAS DO MÊS (Inclui Canceladas para o Relatório PDF)
-  const vendasValidasMes = vendasValidas.filter((v: any) => v.data && v.data.startsWith(mesSelecionado)); // SÓ AS VÁLIDAS DO MÊS (Para Gráficos)
+  const vendasMes = listaVendas.filter((v: any) => v.data && v.data.startsWith(mesSelecionado)); 
+  const vendasValidasMes = vendasValidas.filter((v: any) => v.data && v.data.startsWith(mesSelecionado));
 
   const totalVendidoHoje = vendasHoje.reduce((acc: number, v: any) => acc + v.total, 0);
   const totalVendidoMes = vendasValidasMes.reduce((acc: number, v: any) => acc + v.total, 0);
@@ -371,19 +380,14 @@ export default function DashboardPage() {
     if (!vendedorMapLogs.has(v.id) && !correcoesManuaisLogs.has(v.id) && !v.idVendedor) {
       const pag = formatarPagamentoTabela(v.formaPagamento);
       const vendedorRetroativo = getNomeExibicaoVendedor(v);
-      
-      const itensVendaLocal = listaItens.filter((i: any) => i.idVenda === v.id);
-      const nomesItens = itensVendaLocal.map((i: any) => {
-        const prod = listaProdutos.find((p: any) => p.id === i.idProduto);
-        return `${i.quantidade}x ${prod ? prod.nome : 'Produto (Excluído)'}`;
-      }).join(', ');
+      const nomesItens = getItensDaVenda(v.id);
 
       historicoAuditoria.push({
         id: `venda-retro-${v.id}`,
         data: v.data,
         badge: "📉 BAIXA (SAÍDA)",
         corBadge: "bg-red-50 text-red-700 border-red-200",
-        descricao: `Venda finalizada via ${pag} (Cupom #${v.id}). Estoque reduzido. Itens: ${nomesItens || 'Registos antigos'}`,
+        descricao: `Venda finalizada via ${pag} (Cupom #${v.id}). Estoque reduzido. Itens: ${nomesItens}`,
         autor: vendedorRetroativo
       });
 
@@ -394,7 +398,7 @@ export default function DashboardPage() {
           data: dataCancelamento,
           badge: "📈 ENTRADA (RETORNO)",
           corBadge: "bg-green-50 text-green-700 border-green-200",
-          descricao: `Venda CANCELADA/ESTORNADA via ${pag} (Cupom #${v.id}). Os itens retornaram ao estoque. Itens: ${nomesItens || 'Registos antigos'}`,
+          descricao: `Venda CANCELADA/ESTORNADA via ${pag} (Cupom #${v.id}). Os itens retornaram ao estoque. Itens: ${nomesItens}`,
           autor: 'Admin / Sistema'
         });
       }
@@ -404,7 +408,7 @@ export default function DashboardPage() {
   historicoAuditoria.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
 
   // =========================================================================================
-  // 🚀 EXPORTAÇÃO EXCEL
+  // EXCEL COM ITENS DETALHADOS
   // =========================================================================================
   const exportarParaExcel = () => {
     if (!vendasMes || vendasMes.length === 0) return alert('Nenhuma venda neste mês para exportar.');
@@ -416,18 +420,19 @@ export default function DashboardPage() {
     csvCompleto += "O MUNDO DOS PERFUMES\nRELATÓRIO GERENCIAL DE VENDAS\n";
     csvCompleto += `Mês de Referência: ${mesSelecionado.split('-').reverse().join('/')}\n`;
     csvCompleto += `Data de Emissão: ${dataEmissao}\n\n`;
-    csvCompleto += "Código do Cupom;Data e Hora;Vendedor;Forma de Pagamento;Status da Venda;Valor da Venda (R$)\n";
+    csvCompleto += "Código do Cupom;Data e Hora;Vendedor;Forma de Pagamento;Itens Vendidos;Status da Venda;Valor da Venda (R$)\n";
 
     vendasMes.forEach((v: any) => {
       const idCupom = `#${v.id}`;
       const dataHora = new Date(v.data).toLocaleString('pt-BR');
       const vendedorStr = getNomeExibicaoVendedor(v);
       const pagamentoStr = v.formaPagamento ? v.formaPagamento.toUpperCase() : 'DINHEIRO';
+      const itensStr = getItensDaVenda(v.id);
       const statusStr = v.status === 'cancelada' ? 'CANCELADA' : 'CONCLUÍDA';
       const valorStr = v.total.toFixed(2).replace('.', ',');
-      csvCompleto += `${idCupom};${dataHora};${vendedorStr};${pagamentoStr};${statusStr};${valorStr}\n`;
+      csvCompleto += `${idCupom};${dataHora};${vendedorStr};${pagamentoStr};${itensStr};${statusStr};${valorStr}\n`;
     });
-    csvCompleto += `\n;;;;TOTAL FATURADO LÍQUIDO:;${totalRelatorio.toFixed(2).replace('.', ',')}\n`;
+    csvCompleto += `\n;;;;;TOTAL FATURADO LÍQUIDO:;${totalRelatorio.toFixed(2).replace('.', ',')}\n`;
 
     const blob = new Blob([csvCompleto], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -440,11 +445,11 @@ export default function DashboardPage() {
   };
 
   // =========================================================================================
-  // 🚀 NOVO: EXPORTAÇÃO PDF SUPER PROFISSIONAL E ESTILIZADA
+  // PDF COM ITENS DETALHADOS
   // =========================================================================================
   const exportarParaPDF = () => {
     if (!vendasMes || vendasMes.length === 0) return alert('Nenhuma venda neste mês para exportar.');
-    const popup = window.open('', '_blank', 'width=900,height=1000');
+    const popup = window.open('', '_blank', 'width=1000,height=1000');
     if (!popup) return alert('Por favor, autorize pop-ups no seu navegador para emitir o PDF!');
 
     const vendasValidasRelatorio = vendasMes.filter((v: any) => v.status !== 'cancelada');
@@ -464,6 +469,7 @@ export default function DashboardPage() {
       const vendedorStr = getNomeExibicaoVendedor(v);
       const dataStr = new Date(v.data).toLocaleString('pt-BR');
       const pagamentoStr = formatarPagamentoTabela(v.formaPagamento);
+      const itensStr = getItensDaVenda(v.id);
       
       return `
         <tr class="${v.status === 'cancelada' ? 'linha-cancelada' : ''}">
@@ -471,6 +477,7 @@ export default function DashboardPage() {
           <td>${dataStr}</td>
           <td>${vendedorStr}</td>
           <td>${pagamentoStr}</td>
+          <td><div style="font-size: 8pt; color: #475569; line-height: 1.3;">${itensStr}</div></td>
           <td style="text-align: center;"><span class="status-badge ${statusClasse}">${statusTexto}</span></td>
           <td class="right bold ${valorClasse}">${formataMoeda(v.total)}</td>
         </tr>
@@ -484,7 +491,7 @@ export default function DashboardPage() {
           <title>Relatório de Vendas - ${mesNome}</title>
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
-            @page { size: A4; margin: 10mm; }
+            @page { size: A4 landscape; margin: 10mm; }
             body { 
               font-family: 'Inter', sans-serif; 
               color: #334155; 
@@ -530,7 +537,6 @@ export default function DashboardPage() {
             }
             .header-right strong { color: #475569; }
             
-            /* Resumo Cards */
             .resumo-container {
               display: flex;
               gap: 15px;
@@ -558,12 +564,11 @@ export default function DashboardPage() {
             .val-cancelado { color: #ef4444; }
             .val-liquido { color: #10b981; }
 
-            /* Tabela */
             table { 
               width: 100%; 
               border-collapse: collapse; 
               margin-top: 10px; 
-              font-size: 9pt; 
+              font-size: 8.5pt; 
             }
             th { 
               background: #6A283A; 
@@ -576,7 +581,7 @@ export default function DashboardPage() {
               border: 1px solid #6A283A;
             }
             td { 
-              padding: 10px 12px; 
+              padding: 10px 8px; 
               border-bottom: 1px solid #e2e8f0; 
               vertical-align: middle; 
             }
@@ -584,10 +589,9 @@ export default function DashboardPage() {
             .linha-cancelada td { opacity: 0.6; background-color: #fef2f2; }
             .valor-cancelado { text-decoration: line-through; color: #ef4444 !important; }
             
-            /* Badges */
             .status-badge { 
               padding: 4px 8px; 
-              font-size: 7.5pt; 
+              font-size: 7pt; 
               font-weight: 800; 
               border-radius: 6px; 
               display: inline-block;
@@ -643,18 +647,19 @@ export default function DashboardPage() {
             <table>
               <thead>
                 <tr>
-                  <th style="width: 10%;">Cupom</th>
-                  <th style="width: 18%;">Data e Hora</th>
-                  <th style="width: 17%;">Vendedor</th>
-                  <th style="width: 25%;">Forma de Pagamento</th>
-                  <th style="width: 15%; text-align: center;">Status</th>
-                  <th style="width: 15%;" class="right">Valor</th>
+                  <th style="width: 8%;">Cupom</th>
+                  <th style="width: 14%;">Data e Hora</th>
+                  <th style="width: 12%;">Vendedor</th>
+                  <th style="width: 16%;">Pagamento</th>
+                  <th style="width: 25%;">Itens / Detalhes do Fluxo</th>
+                  <th style="width: 12%; text-align: center;">Status</th>
+                  <th style="width: 13%;" class="right">Valor</th>
                 </tr>
               </thead>
               <tbody>
                 ${linhasTabela}
                 <tr class="total-row bold">
-                  <td colspan="5" class="right">TOTAL LÍQUIDO DO MÊS:</td>
+                  <td colspan="6" class="right">TOTAL LÍQUIDO DO MÊS:</td>
                   <td class="right">${formataMoeda(totalLiquido)}</td>
                 </tr>
               </tbody>
@@ -794,6 +799,7 @@ export default function DashboardPage() {
                     <th className="p-3 text-xs font-bold text-zinc-600 bg-zinc-50">Data</th>
                     <th className="p-3 text-xs font-bold text-zinc-600 bg-zinc-50">Valor</th>
                     <th className="p-3 text-xs font-bold text-zinc-600 bg-zinc-50">Pagamento</th>
+                    <th className="p-3 text-xs font-bold text-zinc-600 bg-zinc-50">Itens / Detalhes</th>
                     <th className="p-3 text-xs font-bold text-zinc-600 bg-zinc-50">Vendedor</th>
                     <th className="p-3 text-xs font-bold text-zinc-600 bg-zinc-50">Status</th>
                     <th className="p-3 text-xs font-bold text-zinc-600 text-right bg-zinc-50">Ação</th>
@@ -806,6 +812,13 @@ export default function DashboardPage() {
                       <td className={`p-3 text-sm font-black ${venda.status === 'cancelada' ? 'text-zinc-400 line-through' : 'text-green-600'}`}>{exibirMoeda(venda.total)}</td>
                       <td className="p-3 text-xs font-bold text-zinc-500 uppercase">{formatarPagamentoTabela(venda.formaPagamento)}</td>
                       
+                      {/* 🚀 NOVA COLUNA COM OS DETALHES DO FLUXO (ITENS) */}
+                      <td className="p-3">
+                        <div className="text-[11px] font-medium leading-tight text-zinc-500 max-w-xs whitespace-normal line-clamp-2" title={getItensDaVenda(venda.id)}>
+                          {getItensDaVenda(venda.id)}
+                        </div>
+                      </td>
+
                       <td 
                         className="p-3 text-xs font-bold text-zinc-600 truncate max-w-[120px] cursor-pointer hover:text-blue-600 group" 
                         title="Clique para corrigir o nome do vendedor desta venda"
@@ -827,7 +840,7 @@ export default function DashboardPage() {
                   ))}
                   {vendasMes.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="p-8 text-center text-zinc-400 font-medium">Nenhuma venda registada em {mesSelecionado.split('-').reverse().join('/')}.</td>
+                      <td colSpan={7} className="p-8 text-center text-zinc-400 font-medium">Nenhuma venda registada em {mesSelecionado.split('-').reverse().join('/')}.</td>
                     </tr>
                   )}
                 </tbody>
