@@ -234,7 +234,6 @@ export default function DashboardPage() {
   const listaClientes = dados?.listaClientes || [];
   const listaItens = dados?.listaItens || [];
 
-  // 🚀 LÓGICA MÁGICA: Buscar os itens de cada venda para mostrar na tabela!
   const getItensDaVenda = (idVenda: number) => {
     const itens = listaItens.filter((i: any) => i.idVenda === idVenda);
     if (itens.length === 0) return 'Itens não encontrados (Antigos)';
@@ -407,9 +406,6 @@ export default function DashboardPage() {
 
   historicoAuditoria.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
 
-  // =========================================================================================
-  // EXCEL COM ITENS DETALHADOS
-  // =========================================================================================
   const exportarParaExcel = () => {
     if (!vendasMes || vendasMes.length === 0) return alert('Nenhuma venda neste mês para exportar.');
     const vendasValidasRelatorio = vendasMes.filter((v: any) => v.status !== 'cancelada');
@@ -444,9 +440,6 @@ export default function DashboardPage() {
     document.body.removeChild(link);
   };
 
-  // =========================================================================================
-  // PDF COM ITENS DETALHADOS
-  // =========================================================================================
   const exportarParaPDF = () => {
     if (!vendasMes || vendasMes.length === 0) return alert('Nenhuma venda neste mês para exportar.');
     const popup = window.open('', '_blank', 'width=1000,height=1000');
@@ -492,128 +485,30 @@ export default function DashboardPage() {
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
             @page { size: A4 landscape; margin: 10mm; }
-            body { 
-              font-family: 'Inter', sans-serif; 
-              color: #334155; 
-              margin: 0; 
-              padding: 20px; 
-              font-size: 10pt; 
-              background: #f8fafc;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
-            .container {
-              background: #fff;
-              padding: 30px;
-              border-radius: 12px;
-              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            }
-            .header { 
-              display: flex; 
-              justify-content: space-between; 
-              align-items: flex-start;
-              border-bottom: 3px solid #6A283A; 
-              padding-bottom: 15px; 
-              margin-bottom: 20px; 
-            }
-            .header-left h1 { 
-              color: #6A283A; 
-              margin: 0 0 5px 0; 
-              font-size: 22pt; 
-              font-weight: 900;
-              text-transform: uppercase;
-              letter-spacing: -0.5px;
-            }
-            .header-left p {
-              margin: 0;
-              color: #64748b;
-              font-size: 11pt;
-              font-weight: 600;
-            }
-            .header-right { 
-              text-align: right; 
-              font-size: 9pt; 
-              color: #94a3b8; 
-            }
+            body { font-family: 'Inter', sans-serif; color: #334155; margin: 0; padding: 20px; font-size: 10pt; background: #f8fafc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .container { background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+            .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #6A283A; padding-bottom: 15px; margin-bottom: 20px; }
+            .header-left h1 { color: #6A283A; margin: 0 0 5px 0; font-size: 22pt; font-weight: 900; text-transform: uppercase; letter-spacing: -0.5px; }
+            .header-left p { margin: 0; color: #64748b; font-size: 11pt; font-weight: 600; }
+            .header-right { text-align: right; font-size: 9pt; color: #94a3b8; }
             .header-right strong { color: #475569; }
-            
-            .resumo-container {
-              display: flex;
-              gap: 15px;
-              margin-bottom: 25px;
-            }
-            .card {
-              flex: 1;
-              padding: 15px;
-              border-radius: 8px;
-              border: 1px solid #e2e8f0;
-              background: #f8fafc;
-            }
-            .card-title {
-              font-size: 8pt;
-              text-transform: uppercase;
-              font-weight: 700;
-              color: #64748b;
-              margin-bottom: 5px;
-            }
-            .card-value {
-              font-size: 16pt;
-              font-weight: 900;
-            }
-            .val-bruto { color: #0f172a; }
-            .val-cancelado { color: #ef4444; }
-            .val-liquido { color: #10b981; }
-
-            table { 
-              width: 100%; 
-              border-collapse: collapse; 
-              margin-top: 10px; 
-              font-size: 8.5pt; 
-            }
-            th { 
-              background: #6A283A; 
-              color: #ffffff; 
-              padding: 12px; 
-              font-weight: 700; 
-              text-transform: uppercase; 
-              font-size: 8pt; 
-              text-align: left;
-              border: 1px solid #6A283A;
-            }
-            td { 
-              padding: 10px 8px; 
-              border-bottom: 1px solid #e2e8f0; 
-              vertical-align: middle; 
-            }
+            .resumo-container { display: flex; gap: 15px; margin-bottom: 25px; }
+            .card { flex: 1; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; }
+            .card-title { font-size: 8pt; text-transform: uppercase; font-weight: 700; color: #64748b; margin-bottom: 5px; }
+            .card-value { font-size: 16pt; font-weight: 900; }
+            .val-bruto { color: #0f172a; } .val-cancelado { color: #ef4444; } .val-liquido { color: #10b981; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 8.5pt; }
+            th { background: #6A283A; color: #ffffff; padding: 12px; font-weight: 700; text-transform: uppercase; font-size: 8pt; text-align: left; border: 1px solid #6A283A; }
+            td { padding: 10px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
             tr:nth-child(even) { background-color: #f8fafc; }
             .linha-cancelada td { opacity: 0.6; background-color: #fef2f2; }
             .valor-cancelado { text-decoration: line-through; color: #ef4444 !important; }
-            
-            .status-badge { 
-              padding: 4px 8px; 
-              font-size: 7pt; 
-              font-weight: 800; 
-              border-radius: 6px; 
-              display: inline-block;
-            }
+            .status-badge { padding: 4px 8px; font-size: 7pt; font-weight: 800; border-radius: 6px; display: inline-block; }
             .status-concluida { background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
             .status-cancelada { background-color: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
-            
-            .right { text-align: right; } 
-            .bold { font-weight: bold; } 
-            
-            .total-row td { 
-              border-top: 2px solid #6A283A; 
-              background: #fdf2f5;
-              color: #6A283A; 
-              padding: 15px 12px; 
-              font-size: 11pt;
-            }
-
-            @media print {
-              body { background: #fff; padding: 0; }
-              .container { box-shadow: none; border: none; padding: 0; }
-            }
+            .right { text-align: right; } .bold { font-weight: bold; } 
+            .total-row td { border-top: 2px solid #6A283A; background: #fdf2f5; color: #6A283A; padding: 15px 12px; font-size: 11pt; }
+            @media print { body { background: #fff; padding: 0; } .container { box-shadow: none; border: none; padding: 0; } }
           </style>
         </head>
         <body>
@@ -628,53 +523,153 @@ export default function DashboardPage() {
                 <p>Emitido em: <strong>${dataEmissao}</strong></p>
               </div>
             </div>
-            
             <div class="resumo-container">
-              <div class="card" style="border-left: 4px solid #94a3b8;">
-                <div class="card-title">Faturamento Bruto</div>
-                <div class="card-value val-bruto">${formataMoeda(totalBruto)}</div>
-              </div>
-              <div class="card" style="border-left: 4px solid #ef4444;">
-                <div class="card-title">Devoluções / Cancelados</div>
-                <div class="card-value val-cancelado">${formataMoeda(totalCancelado)}</div>
-              </div>
-              <div class="card" style="border-left: 4px solid #10b981; background: #ecfdf5;">
-                <div class="card-title" style="color: #047857;">Total Líquido</div>
-                <div class="card-value val-liquido">${formataMoeda(totalLiquido)}</div>
-              </div>
+              <div class="card" style="border-left: 4px solid #94a3b8;"><div class="card-title">Faturamento Bruto</div><div class="card-value val-bruto">${formataMoeda(totalBruto)}</div></div>
+              <div class="card" style="border-left: 4px solid #ef4444;"><div class="card-title">Devoluções / Cancelados</div><div class="card-value val-cancelado">${formataMoeda(totalCancelado)}</div></div>
+              <div class="card" style="border-left: 4px solid #10b981; background: #ecfdf5;"><div class="card-title" style="color: #047857;">Total Líquido</div><div class="card-value val-liquido">${formataMoeda(totalLiquido)}</div></div>
             </div>
-
             <table>
-              <thead>
-                <tr>
-                  <th style="width: 8%;">Cupom</th>
-                  <th style="width: 14%;">Data e Hora</th>
-                  <th style="width: 12%;">Vendedor</th>
-                  <th style="width: 16%;">Pagamento</th>
-                  <th style="width: 25%;">Itens / Detalhes do Fluxo</th>
-                  <th style="width: 12%; text-align: center;">Status</th>
-                  <th style="width: 13%;" class="right">Valor</th>
-                </tr>
-              </thead>
+              <thead><tr><th style="width: 8%;">Cupom</th><th style="width: 14%;">Data e Hora</th><th style="width: 12%;">Vendedor</th><th style="width: 16%;">Pagamento</th><th style="width: 25%;">Itens / Detalhes do Fluxo</th><th style="width: 12%; text-align: center;">Status</th><th style="width: 13%;" class="right">Valor</th></tr></thead>
               <tbody>
                 ${linhasTabela}
-                <tr class="total-row bold">
-                  <td colspan="6" class="right">TOTAL LÍQUIDO DO MÊS:</td>
-                  <td class="right">${formataMoeda(totalLiquido)}</td>
-                </tr>
+                <tr class="total-row bold"><td colspan="6" class="right">TOTAL LÍQUIDO DO MÊS:</td><td class="right">${formataMoeda(totalLiquido)}</td></tr>
               </tbody>
             </table>
-            <div style="text-align: center; margin-top: 30px; font-size: 8pt; color: #94a3b8;">
-              Relatório gerado automaticamente pelo sistema O Mundo dos Perfumes.
+            <div style="text-align: center; margin-top: 30px; font-size: 8pt; color: #94a3b8;">Relatório gerado automaticamente pelo sistema O Mundo dos Perfumes.</div>
+          </div>
+          <script>window.onload = function() { setTimeout(() => { window.print(); }, 300); }</script>
+        </body>
+      </html>
+    `);
+    popup.document.close();
+  };
+
+  // =========================================================================================
+  // 🚀 NOVO: EXPORTAÇÃO PDF CONTÁBIL (SOMENTE CNPJ)
+  // =========================================================================================
+  const exportarRelatorioContadorPDF = () => {
+    // Isola apenas as vendas válidas do mês selecionado
+    const vendasParaContador = vendasValidasMes.map((v: any) => {
+      const formaStr = String(v.formaPagamento).toLowerCase();
+      let valorCNPJ = 0;
+      let descricoesForma: string[] = [];
+
+      // Filtra exatamente as modalidades que passam pela conta bancária
+      if (formaStr === 'pix') { 
+        valorCNPJ = v.total; 
+        descricoesForma.push('PIX'); 
+      }
+      else if (formaStr === 'credito') { 
+        valorCNPJ = v.total; 
+        descricoesForma.push('Cartão de Crédito'); 
+      }
+      else if (formaStr === 'debito') { 
+        valorCNPJ = v.total; 
+        descricoesForma.push('Cartão de Débito'); 
+      }
+      else if (formaStr.startsWith('multiplo:')) {
+        const partes = formaStr.replace('multiplo:', '').split(';');
+        for (const parte of partes) {
+          const [tipo, valor] = parte.split('=');
+          const valNum = Number(valor) || 0;
+          if (valNum > 0) {
+            if (tipo === 'pix') { valorCNPJ += valNum; descricoesForma.push(`PIX (${formataMoeda(valNum)})`); }
+            if (tipo === 'credito') { valorCNPJ += valNum; descricoesForma.push(`Crédito (${formataMoeda(valNum)})`); }
+            if (tipo === 'debito') { valorCNPJ += valNum; descricoesForma.push(`Débito (${formataMoeda(valNum)})`); }
+          }
+        }
+      }
+
+      return {
+        ...v,
+        valorCNPJ,
+        textoFormasCNPJ: descricoesForma.join(' + ')
+      };
+    }).filter((v: any) => v.valorCNPJ > 0); // Exclui tudo que foi puramente Dinheiro ou Venda Direta
+
+    if (vendasParaContador.length === 0) {
+      return alert('Não há vendas registradas via PIX ou Cartão (CNPJ) para o mês selecionado.');
+    }
+
+    const popup = window.open('', '_blank', 'width=1000,height=1000');
+    if (!popup) return alert('Por favor, autorize pop-ups no seu navegador para emitir o PDF!');
+
+    const dataEmissao = new Date().toLocaleString('pt-BR');
+    const mesNome = mesSelecionado.split('-').reverse().join('/');
+    const totalFiscalCalculado = vendasParaContador.reduce((acc: number, v: any) => acc + v.valorCNPJ, 0);
+
+    const linhasTabela = vendasParaContador.map((v: any) => `
+      <tr>
+        <td>${new Date(v.data).toLocaleString('pt-BR')}</td>
+        <td><strong>#${v.id}</strong></td>
+        <td>${v.textoFormasCNPJ}</td>
+        <td class="right bold">${formataMoeda(v.valorCNPJ)}</td>
+      </tr>
+    `).join('');
+
+    popup.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Relatório Fiscal - ${mesNome}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+            @page { size: A4; margin: 15mm; }
+            body { font-family: 'Inter', sans-serif; color: #1e293b; margin: 0; padding: 0; font-size: 10pt; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .header { border-bottom: 2px solid #0f172a; padding-bottom: 15px; margin-bottom: 30px; }
+            h1 { color: #0f172a; margin: 0 0 5px 0; font-size: 18pt; font-weight: 900; text-transform: uppercase; letter-spacing: -0.5px; }
+            p { margin: 0; color: #475569; font-size: 10pt; }
+            .resumo { display: flex; gap: 15px; margin-bottom: 30px; }
+            .card { flex: 1; padding: 15px; border-radius: 6px; border: 1px solid #cbd5e1; background: #f8fafc; }
+            .card-title { font-size: 8pt; text-transform: uppercase; font-weight: 700; color: #475569; margin-bottom: 8px; }
+            .card-value { font-size: 18pt; font-weight: 900; color: #0f172a; }
+            table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+            th { background: #f1f5f9; color: #0f172a; padding: 10px 12px; font-weight: 700; text-transform: uppercase; font-size: 8pt; text-align: left; border-bottom: 2px solid #cbd5e1; }
+            td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+            .right { text-align: right; } .bold { font-weight: bold; } 
+            .total-row td { border-top: 2px solid #0f172a; color: #0f172a; padding: 15px 12px; font-size: 11pt; background: #f8fafc; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div style="float: right; text-align: right;">
+              <p>Competência: <strong>${mesNome}</strong></p>
+              <p>Emitido: <strong>${dataEmissao}</strong></p>
+            </div>
+            <h1>RELATÓRIO FISCAL - CNPJ</h1>
+            <p>O MUNDO DOS PERFUMES</p>
+          </div>
+          
+          <div class="resumo">
+            <div class="card">
+              <div class="card-title">Total via PIX</div>
+              <div class="card-value">${formataMoeda(mesPix)}</div>
+            </div>
+            <div class="card">
+              <div class="card-title">Total Cartão (Débito)</div>
+              <div class="card-value">${formataMoeda(mesDebito)}</div>
+            </div>
+            <div class="card">
+              <div class="card-title">Total Cartão (Crédito)</div>
+              <div class="card-value">${formataMoeda(mesCredito)}</div>
             </div>
           </div>
-          <script>
-            window.onload = function() { 
-              setTimeout(() => {
-                window.print(); 
-              }, 300);
-            }
-          </script>
+
+          <div style="background: #0f172a; color: #fff; padding: 15px; border-radius: 6px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 9pt; text-transform: uppercase; font-weight: 700;">Base de Cálculo (Total CNPJ)</div>
+            <div style="font-size: 18pt; font-weight: 900;">${formataMoeda(totalFiscalCalculado)}</div>
+          </div>
+
+          <h3 style="color: #0f172a; font-size: 11pt; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-bottom: 15px;">Detalhamento das Operações (PIX / Cartões)</h3>
+          <table>
+            <thead><tr><th style="width: 20%;">Data/Hora</th><th style="width: 15%;">Nº Cupom</th><th style="width: 45%;">Origem Fiscal (Forma)</th><th style="width: 20%;" class="right">Valor R$</th></tr></thead>
+            <tbody>
+              ${linhasTabela}
+              <tr class="total-row bold"><td colspan="3" class="right">TOTAL TRIBUTÁVEL:</td><td class="right">${formataMoeda(totalFiscalCalculado)}</td></tr>
+            </tbody>
+          </table>
+          <div style="text-align: center; margin-top: 40px; font-size: 8pt; color: #94a3b8;">Documento de uso gerencial e contábil. Dinheiro físico e valores pendentes foram excluídos.</div>
+          <script>window.onload = function() { setTimeout(() => { window.print(); }, 300); }</script>
         </body>
       </html>
     `);
@@ -693,7 +688,8 @@ export default function DashboardPage() {
           </div>
         </div>
         
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        {/* 🚀 BOTÃO RELATÓRIO DO CONTADOR ADICIONADO AQUI! */}
+        <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap sm:flex-nowrap justify-end">
           <div className="flex items-center gap-2 bg-white px-3 py-2.5 rounded-xl border border-[#E0DDDD] shadow-sm flex-1 sm:flex-none">
             <span className="text-lg">📅</span>
             <input 
@@ -703,11 +699,20 @@ export default function DashboardPage() {
               className="bg-transparent text-sm font-black text-[#6A283A] outline-none cursor-pointer w-full"
             />
           </div>
+          
+          <button 
+            onClick={exportarRelatorioContadorPDF} 
+            title="Gera um PDF somente com PIX e Cartões para pagar o imposto"
+            className="bg-zinc-800 text-white flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-black transition-all shadow-sm hover:bg-zinc-700 flex-1 sm:flex-none"
+          >
+            🖨️ Relatório Contador
+          </button>
+
           <button 
             onClick={handleAlternarPrivacidade}
-            className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-black transition-all shadow-sm flex-1 sm:flex-none ${ocultarValores ? 'bg-zinc-800 text-white' : 'bg-white border border-[#E0DDDD] text-zinc-600 hover:bg-zinc-50'}`}
+            className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-black transition-all shadow-sm flex-1 sm:flex-none ${ocultarValores ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-white border border-[#E0DDDD] text-zinc-600 hover:bg-zinc-50'}`}
           >
-            {ocultarValores ? '👁️ Valores' : '🙈 Ocultar'}
+            {ocultarValores ? '👁️ Mostrar' : '🙈 Ocultar'}
           </button>
         </div>
       </div>
@@ -789,7 +794,7 @@ export default function DashboardPage() {
               <h2 className="text-xl font-bold text-[#6A283A]">Histórico de Vendas ({mesSelecionado.split('-').reverse().join('/')})</h2>
               <div className="flex items-center gap-2">
                 <button onClick={exportarParaExcel} className="bg-green-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm">📥 Excel</button>
-                <button onClick={exportarParaPDF} className="bg-[#6A283A] text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm">📄 PDF</button>
+                <button onClick={exportarParaPDF} className="bg-[#6A283A] text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm">📄 PDF (Completo)</button>
               </div>
             </div>
             <div className="overflow-x-auto rounded-lg border border-[#E0DDDD]/60 flex-1 max-h-[400px] overflow-y-auto">
@@ -812,7 +817,6 @@ export default function DashboardPage() {
                       <td className={`p-3 text-sm font-black ${venda.status === 'cancelada' ? 'text-zinc-400 line-through' : 'text-green-600'}`}>{exibirMoeda(venda.total)}</td>
                       <td className="p-3 text-xs font-bold text-zinc-500 uppercase">{formatarPagamentoTabela(venda.formaPagamento)}</td>
                       
-                      {/* 🚀 NOVA COLUNA COM OS DETALHES DO FLUXO (ITENS) */}
                       <td className="p-3">
                         <div className="text-[11px] font-medium leading-tight text-zinc-500 max-w-xs whitespace-normal line-clamp-2" title={getItensDaVenda(venda.id)}>
                           {getItensDaVenda(venda.id)}
