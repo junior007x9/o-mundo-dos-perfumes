@@ -418,8 +418,8 @@ export default function CaixaPage() {
   }
 
   return (
-    // 🚀 AQUI O CONTAINER DO PDV ABRAÇA 100% DA TELA E CORTA O QUE PASSA PARA GERAR SCROLL INTERNO
-    <div className="flex flex-col gap-4 h-[calc(100vh-2rem)] md:h-[calc(100vh-6rem)] lg:h-[calc(100vh-8rem)]">
+    // 🚀 ATENÇÃO AQUI: flex-1 e min-h-0 forçam o contêiner principal a esticar até o fim da tela!
+    <div className="flex flex-col gap-4 flex-1 h-full min-h-0 w-full overflow-hidden">
       
       {modalCliente && (
         <div className="fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
@@ -528,7 +528,7 @@ export default function CaixaPage() {
         </button>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
+      <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0 w-full overflow-hidden">
         
         {/* 🚀 LADO ESQUERDO: CATÁLOGO */}
         <div className="bg-white flex flex-col rounded-xl shadow-sm border border-[#E0DDDD] flex-1 min-h-0 overflow-hidden">
@@ -568,7 +568,7 @@ export default function CaixaPage() {
             <span className="bg-white text-[#6A283A] font-black px-3 py-1 rounded-md text-xs shadow-sm">{carrinho.length} Itens</span>
           </div>
           
-          {/* ÁREA DO CARRINHO (Cresce e encolhe) */}
+          {/* ÁREA DO CARRINHO */}
           <div className="overflow-y-auto p-3 space-y-2 bg-white flex-1 min-h-[150px]">
             {carrinho.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-zinc-400 p-4 text-center">
@@ -594,11 +594,10 @@ export default function CaixaPage() {
             )}
           </div>
 
-          {/* 🚀 CAIXA DE PAGAMENTO COM SCROLL PRÓPRIO E GRANDE */}
-          <div className="flex flex-col flex-shrink-0 bg-white border-t-2 border-zinc-200 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] relative z-10">
+          {/* 🚀 CAIXA DE PAGAMENTO - AGORA DESLIZANTE PARA CABER EM QUALQUER TELA */}
+          <div className="flex flex-col flex-shrink-0 max-h-[55%] bg-white border-t-2 border-zinc-200 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] relative z-10">
             
-            {/* CORPO DO FORMULÁRIO */}
-            <div className="p-4 md:p-5 overflow-y-auto max-h-[50vh] space-y-4">
+            <div className="p-4 md:p-5 overflow-y-auto flex-1 space-y-4">
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -705,7 +704,6 @@ export default function CaixaPage() {
                   </div>
                 </div>
               )}
-
             </div>
 
             {/* 🚀 RODAPÉ FIXO DE FINALIZAÇÃO */}
