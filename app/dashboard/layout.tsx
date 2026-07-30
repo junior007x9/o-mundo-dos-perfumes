@@ -40,14 +40,13 @@ export default function DashboardLayout({
 
   const isAdmin = usuario?.cargo === 'admin';
 
-  // 🚀 ATUALIZADO: Novas rotas administrativas protegidas contra vendedores
   const rotasBloqueadasParaVendedor = [
     '/dashboard/produtos',
     '/dashboard/vendedores',
     '/dashboard/fornecedores',
-    '/dashboard/caixas',       // Auditoria de Caixas
-    '/dashboard/financeiro',   // Controle Financeiro
-    '/dashboard/relatorio-fiscal' // 🚀 NOVO: Relatório do Contador protegido
+    '/dashboard/caixas',       
+    '/dashboard/financeiro',   
+    '/dashboard/relatorio-fiscal' 
   ];
 
   const acessoBloqueado = !isAdmin && rotasBloqueadasParaVendedor.includes(pathname);
@@ -107,6 +106,11 @@ export default function DashboardLayout({
               <span className="text-xl">👥</span><span>Clientes</span>
             </Link>
 
+            {/* 🚀 BOTÃO DE TUTORIAIS ADICIONADO AQUI PARA TODOS VEREM */}
+            <Link onClick={fecharMenu} href="/dashboard/tutoriais" className={`flex items-center space-x-4 px-4 py-3 rounded-lg text-sm font-bold hover:bg-[#EED9D4] hover:text-[#6A283A] transition-all ${pathname === '/dashboard/tutoriais' ? 'bg-[#EED9D4] text-[#6A283A]' : 'text-white/90'}`}>
+              <span className="text-xl">📚</span><span>Tutoriais / Ajuda</span>
+            </Link>
+
             {isAdmin && (
               <>
                 <Link onClick={fecharMenu} href="/dashboard/produtos" className={`flex items-center space-x-4 px-4 py-3 rounded-lg text-sm font-bold hover:bg-[#EED9D4] hover:text-[#6A283A] transition-all ${pathname === '/dashboard/produtos' ? 'bg-[#EED9D4] text-[#6A283A]' : 'text-white/90'}`}>
@@ -129,7 +133,6 @@ export default function DashboardLayout({
                   <span className="text-xl">🚚</span><span>Fornecedores</span>
                 </Link>
 
-                {/* 🚀 NOVO BOTÃO ADICIONADO AQUI! */}
                 <Link onClick={fecharMenu} href="/dashboard/relatorio-fiscal" className={`flex items-center space-x-4 px-4 py-3 rounded-lg text-sm font-bold hover:bg-[#EED9D4] hover:text-[#6A283A] transition-all ${pathname === '/dashboard/relatorio-fiscal' ? 'bg-[#EED9D4] text-[#6A283A]' : 'text-white/90'}`}>
                   <span className="text-xl">📄</span><span>Relatório Contador</span>
                 </Link>
