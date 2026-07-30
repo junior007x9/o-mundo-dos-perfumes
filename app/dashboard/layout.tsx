@@ -45,8 +45,9 @@ export default function DashboardLayout({
     '/dashboard/produtos',
     '/dashboard/vendedores',
     '/dashboard/fornecedores',
-    '/dashboard/caixas',       // Nova Auditoria de Caixas
-    '/dashboard/financeiro'    // Novo Controle Financeiro
+    '/dashboard/caixas',       // Auditoria de Caixas
+    '/dashboard/financeiro',   // Controle Financeiro
+    '/dashboard/relatorio-fiscal' // 🚀 NOVO: Relatório do Contador protegido
   ];
 
   const acessoBloqueado = !isAdmin && rotasBloqueadasParaVendedor.includes(pathname);
@@ -79,7 +80,7 @@ export default function DashboardLayout({
 
       {/* Sidebar - Menu Lateral */}
       <aside className={`fixed inset-y-0 left-0 w-72 md:w-64 bg-[#6A283A] text-white flex flex-col justify-between p-4 shadow-2xl z-40 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${menuAberto ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="overflow-y-auto">
+        <div className="overflow-y-auto scrollbar-none">
           
           <div className="mb-6 px-2 py-5 border-b border-[#EED9D4]/20 flex flex-col items-center rounded-xl">
             <div className="relative w-16 h-16 mb-2 rounded-full bg-white/10 flex items-center justify-center text-2xl border border-white/10">
@@ -91,7 +92,7 @@ export default function DashboardLayout({
             </p>
           </div>
 
-          <nav className="space-y-1.5">
+          <nav className="space-y-1.5 pb-4">
             
             <Link onClick={fecharMenu} href="/dashboard" className={`flex items-center space-x-4 px-4 py-3 rounded-lg text-sm font-bold hover:bg-[#EED9D4] hover:text-[#6A283A] transition-all ${pathname === '/dashboard' ? 'bg-[#EED9D4] text-[#6A283A]' : 'text-white/90'}`}>
               <span className="text-xl">{isAdmin ? '📊' : '🎯'}</span>
@@ -112,7 +113,6 @@ export default function DashboardLayout({
                   <span className="text-xl">🛍️</span><span>Produtos & Estoque</span>
                 </Link>
 
-                {/* 🚀 NOVOS BOTÕES ADICIONADOS AQUI */}
                 <Link onClick={fecharMenu} href="/dashboard/caixas" className={`flex items-center space-x-4 px-4 py-3 rounded-lg text-sm font-bold hover:bg-[#EED9D4] hover:text-[#6A283A] transition-all ${pathname === '/dashboard/caixas' ? 'bg-[#EED9D4] text-[#6A283A]' : 'text-white/90'}`}>
                   <span className="text-xl">🔐</span><span>Auditoria de Caixas</span>
                 </Link>
@@ -120,7 +120,6 @@ export default function DashboardLayout({
                 <Link onClick={fecharMenu} href="/dashboard/financeiro" className={`flex items-center space-x-4 px-4 py-3 rounded-lg text-sm font-bold hover:bg-[#EED9D4] hover:text-[#6A283A] transition-all ${pathname === '/dashboard/financeiro' ? 'bg-[#EED9D4] text-[#6A283A]' : 'text-white/90'}`}>
                   <span className="text-xl">📈</span><span>Financeiro</span>
                 </Link>
-                {/* ---------------------------------- */}
 
                 <Link onClick={fecharMenu} href="/dashboard/vendedores" className={`flex items-center space-x-4 px-4 py-3 rounded-lg text-sm font-bold hover:bg-[#EED9D4] hover:text-[#6A283A] transition-all ${pathname === '/dashboard/vendedores' ? 'bg-[#EED9D4] text-[#6A283A]' : 'text-white/90'}`}>
                   <span className="text-xl">👔</span><span>Vendedores</span>
@@ -129,12 +128,17 @@ export default function DashboardLayout({
                 <Link onClick={fecharMenu} href="/dashboard/fornecedores" className={`flex items-center space-x-4 px-4 py-3 rounded-lg text-sm font-bold hover:bg-[#EED9D4] hover:text-[#6A283A] transition-all ${pathname === '/dashboard/fornecedores' ? 'bg-[#EED9D4] text-[#6A283A]' : 'text-white/90'}`}>
                   <span className="text-xl">🚚</span><span>Fornecedores</span>
                 </Link>
+
+                {/* 🚀 NOVO BOTÃO ADICIONADO AQUI! */}
+                <Link onClick={fecharMenu} href="/dashboard/relatorio-fiscal" className={`flex items-center space-x-4 px-4 py-3 rounded-lg text-sm font-bold hover:bg-[#EED9D4] hover:text-[#6A283A] transition-all ${pathname === '/dashboard/relatorio-fiscal' ? 'bg-[#EED9D4] text-[#6A283A]' : 'text-white/90'}`}>
+                  <span className="text-xl">📄</span><span>Relatório Contador</span>
+                </Link>
               </>
             )}
           </nav>
         </div>
 
-        <div className="pt-4 border-t border-[#EED9D4]/20 mt-4">
+        <div className="pt-4 border-t border-[#EED9D4]/20 mt-4 flex-shrink-0">
           <form action={sairDoSistema}>
             <button type="submit" className="w-full flex items-center space-x-4 px-4 py-3 rounded-lg text-sm font-bold bg-black/20 text-[#EED9D4] hover:bg-red-600 hover:text-white transition-all shadow-inner">
               <span className="text-xl">🚪</span><span>Sair do Sistema</span>
