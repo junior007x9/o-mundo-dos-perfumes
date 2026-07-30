@@ -418,8 +418,8 @@ export default function CaixaPage() {
   }
 
   return (
-    // 🚀 ATENÇÃO AQUI: flex-1 e min-h-0 forçam o contêiner principal a esticar até o fim da tela!
-    <div className="flex flex-col gap-4 flex-1 h-full min-h-0 w-full overflow-hidden">
+    // 🚀 ROOT WRAPPER: Oculta qualquer expansão e usa o w-full
+    <div className="flex flex-col gap-4 w-full h-full overflow-hidden">
       
       {modalCliente && (
         <div className="fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
@@ -511,6 +511,7 @@ export default function CaixaPage() {
         </div>
       )}
 
+      {/* SEARCH BAR FIXED AT TOP */}
       <div className="flex-shrink-0 bg-white p-3 rounded-xl shadow-sm border border-[#E0DDDD] flex gap-2">
         <div className="relative flex-1">
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -528,14 +529,16 @@ export default function CaixaPage() {
         </button>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0 w-full overflow-hidden">
+      {/* 🚀 SPLIT VIEW COM ALTURA CALCULADA PARA MATAR O ESPAÇO VAZIO E FORÇAR SCROLL INTERNO */}
+      <div className="flex flex-col lg:flex-row gap-4 w-full" style={{ height: 'calc(100vh - 150px)' }}>
         
-        {/* 🚀 LADO ESQUERDO: CATÁLOGO */}
-        <div className="bg-white flex flex-col rounded-xl shadow-sm border border-[#E0DDDD] flex-1 min-h-0 overflow-hidden">
+        {/* LADO ESQUERDO: CATÁLOGO */}
+        <div className="bg-white flex flex-col rounded-xl shadow-sm border border-[#E0DDDD] flex-1 overflow-hidden h-full">
           <div className="flex-shrink-0 flex justify-between items-center p-4 border-b border-[#E0DDDD] bg-zinc-50">
             <h2 className="text-lg font-black text-[#6A283A]">Catálogo Rápido</h2>
             <button onClick={() => setModalFechamento(true)} className="text-xs font-bold bg-red-600 text-white px-4 py-2 rounded-lg uppercase shadow-sm hover:bg-red-700 transition-colors">🔒 Fechar Caixa</button>
           </div>
+          
           <div className="flex-1 overflow-y-auto p-4">
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
               {produtosFiltrados.map((p) => (
@@ -560,16 +563,16 @@ export default function CaixaPage() {
           </div>
         </div>
 
-        {/* 🚀 LADO DIREITO: CUPOM E PAGAMENTO */}
-        <div className="w-full lg:w-[450px] xl:w-[480px] bg-zinc-50 flex flex-col h-full rounded-xl shadow-xl border border-[#E0DDDD] flex-shrink-0 min-h-0 overflow-hidden">
+        {/* LADO DIREITO: CUPOM E PAGAMENTO */}
+        <div className="w-full lg:w-[450px] xl:w-[480px] bg-zinc-50 flex flex-col rounded-xl shadow-xl border border-[#E0DDDD] flex-shrink-0 overflow-hidden h-full">
           
           <div className="flex-shrink-0 bg-[#6A283A] text-white p-4 flex justify-between items-center shadow-md z-10">
             <h2 className="text-sm font-black uppercase tracking-widest">🛒 Cupom Fiscal</h2>
             <span className="bg-white text-[#6A283A] font-black px-3 py-1 rounded-md text-xs shadow-sm">{carrinho.length} Itens</span>
           </div>
           
-          {/* ÁREA DO CARRINHO */}
-          <div className="overflow-y-auto p-3 space-y-2 bg-white flex-1 min-h-[150px]">
+          {/* ÁREA DO CARRINHO (Rola apenas internamente) */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-white">
             {carrinho.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-zinc-400 p-4 text-center">
                 <span className="text-5xl opacity-30 mb-3">🛍️</span>
@@ -594,11 +597,10 @@ export default function CaixaPage() {
             )}
           </div>
 
-          {/* 🚀 CAIXA DE PAGAMENTO - AGORA DESLIZANTE PARA CABER EM QUALQUER TELA */}
-          <div className="flex flex-col flex-shrink-0 max-h-[55%] bg-white border-t-2 border-zinc-200 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] relative z-10">
+          {/* CAIXA DE PAGAMENTO - LIMITE DE ALTURA PARA NÃO ENGOLIR O BOTÃO */}
+          <div className="flex flex-col flex-shrink-0 bg-white border-t-2 border-zinc-200 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] relative z-10">
             
-            <div className="p-4 md:p-5 overflow-y-auto flex-1 space-y-4">
-              
+            <div className="p-4 md:p-5 overflow-y-auto max-h-[45vh] space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-bold text-zinc-500 uppercase mb-1.5 block">🏷️ Desconto (R$)</label>
@@ -706,7 +708,7 @@ export default function CaixaPage() {
               )}
             </div>
 
-            {/* 🚀 RODAPÉ FIXO DE FINALIZAÇÃO */}
+            {/* RODAPÉ FIXO DE FINALIZAÇÃO */}
             <div className="p-4 md:p-5 bg-zinc-50 border-t border-zinc-200 rounded-b-xl flex-shrink-0 shadow-inner">
               <div className="flex items-stretch gap-4">
                 <div className="flex-[1.2] bg-white border border-zinc-300 rounded-xl p-3 flex flex-col justify-center items-center shadow-sm">
