@@ -39,6 +39,15 @@ export default function CaixaPage() {
   const [valoresMultiplos, setValoresMultiplos] = useState({ dinheiro: '', pix: '', credito: '', debito: '' });
   
   const [observacaoDireta, setObservacaoDireta] = useState('');
+  
+  // 🚀 CAMPOS DE PARCELAMENTO RESTAURADOS
+  const [parcelasDireta, setParcelasDireta] = useState<number>(1);
+  const [primeiroVencimento, setPrimeiroVencimento] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1); // Por padrão, lança para daqui a 30 dias
+    return d.toISOString().split('T')[0];
+  });
+
   const [observacaoMultipla, setObservacaoMultipla] = useState(''); 
 
   const [modalFechamento, setModalFechamento] = useState(false);
@@ -243,10 +252,11 @@ export default function CaixaPage() {
     setProcessandoVenda(true);
 
     try {
+      // 🚀 SALVA A INFORMAÇÃO COMPLETA DAS PARCELAS PARA O SISTEMA AUTOMATIZAR DEPOIS
       const formaEnvio = pagamento === 'multiplo'
         ? `multiplo:dinheiro=${(Number(valoresMultiplos.dinheiro) || 0) - trocoMultiplo};pix=${Number(valoresMultiplos.pix) || 0};credito=${Number(valoresMultiplos.credito) || 0};debito=${Number(valoresMultiplos.debito) || 0}${observacaoMultipla.trim() ? `;obs=${observacaoMultipla.replace(/[:;=]/g, ' ')}` : ''}`
-        : pagamento === 'venda_direta' && observacaoDireta.trim()
-          ? `venda_direta:obs=${observacaoDireta.replace(/[:;=]/g, ' ')}`
+        : pagamento === 'venda_direta'
+          ? `venda_direta:parcelas=${parcelasDireta}:pagas=0:data=${primeiroVencimento || new Date().toISOString().split('T')[0]}:obs=${observacaoDireta.replace(/[:;=]/g, ' ')}`
           : pagamento;
 
       const clienteObj = clientesDB.find(c => c.id.toString() === clienteSelecionado);
@@ -273,6 +283,7 @@ export default function CaixaPage() {
       setDesconto('');
       setValoresMultiplos({ dinheiro: '', pix: '', credito: '', debito: '' });
       setObservacaoDireta('');
+      setParcelasDireta(1);
       setObservacaoMultipla(''); 
       setPagamento('dinheiro');
       setClienteSelecionado(''); 
@@ -358,7 +369,6 @@ export default function CaixaPage() {
     setModalFechamento(false);
   };
 
-  // 🚀 PESQUISA MELHORADA: Busca no Nome e na Marca (Descrição)
   const produtosFiltrados = produtos.filter((p) => {
     if (!buscaTexto.trim()) return true;
     const termo = buscaTexto.toLowerCase();
@@ -532,7 +542,6 @@ export default function CaixaPage() {
               {produtosFiltrados.map((p) => (
                 <button key={p.id} onClick={() => adicionarAoCarrinho(p)} disabled={p.estoque <= 0} className={`p-3 border-2 rounded-xl text-left transition-all flex flex-col justify-between ${p.estoque > 0 ? 'border-[#E0DDDD] hover:border-[#6A283A] bg-white hover:bg-[#f9f1f0] active:scale-95 shadow-sm' : 'border-zinc-200 opacity-50 bg-zinc-100 cursor-not-allowed'}`}>
                   
-                  {/* 🚀 VISUAL DOS CARDS: Nome + Marca fixos e alinhados! */}
                   <div className="w-full">
                     <h3 className="font-bold text-zinc-900 text-xs md:text-sm leading-tight line-clamp-2 h-8">{p.nome}</h3>
                     <p className="text-[9px] md:text-[10px] font-black text-purple-600 uppercase mt-1 line-clamp-1 h-3">{p.marca || p.descricao || ' '}</p>
@@ -571,7 +580,6 @@ export default function CaixaPage() {
                   <div className="flex-1 pr-2">
                     <p className="font-bold text-zinc-800 text-xs md:text-sm leading-tight">{item.nome}</p>
                     
-                    {/* Exibe a Marca/Descrição também no carrinho para confirmar */}
                     {(item.marca || item.descricao) && (
                       <p className="text-[9px] font-black text-purple-600 uppercase mt-0.5 line-clamp-1">{item.marca || item.descricao}</p>
                     )}
@@ -623,10 +631,26 @@ export default function CaixaPage() {
               </select>
             </div>
 
+            {/* 🚀 SISTEMA DE PARCELAMENTO REFEITO (COM DATA) */}
             {pagamento === 'venda_direta' && (
-              <div className="mb-3 lg:mb-2 animate-in fade-in duration-200">
-                <label className="text-[11px] lg:text-[10px] font-bold text-purple-700 uppercase mb-1 lg:mb-0.5 block">📝 Nota / Parcelas (Oculto no cupom)</label>
-                <input type="text" value={observacaoDireta} onChange={(e) => setObservacaoDireta(e.target.value)} placeholder="Ex: Combinado 3x de R$ 50 no dia 10" className="w-full p-3 lg:p-2 rounded bg-purple-50 text-purple-900 border-2 border-purple-200 font-bold text-sm lg:text-xs outline-none focus:border-purple-500" />
+              <div className="mb-3 lg:mb-2 animate-in fade-in duration-200 grid grid-cols-2 gap-2">
+                <div className="col-span-2 lg:col-span-1">
+                  <label className="text-[11px] lg:text-[10px] font-bold text-purple-700 uppercase mb-1 lg:mb-0.5 block">Nº de Parcelas</label>
+                  <input type="number" min="1" max="24" value={parcelasDireta} onChange={(e) => setParcelasDireta(Number(e.target.value))} className="w-full p-3 lg:p-2 rounded bg-purple-50 text-purple-900 border-2 border-purple-200 font-bold text-sm outline-none focus:border-purple-500" />
+                </div>
+                <div className="col-span-2 lg:col-span-1">
+                  <label className="text-[11px] lg:text-[10px] font-bold text-purple-700 uppercase mb-1 lg:mb-0.5 block">1º Vencimento</label>
+                  <input type="date" value={primeiroVencimento} onChange={(e) => setPrimeiroVencimento(e.target.value)} className="w-full p-3 lg:p-2 rounded bg-purple-50 text-purple-900 border-2 border-purple-200 font-bold text-sm outline-none focus:border-purple-500" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[11px] lg:text-[10px] font-bold text-purple-700 uppercase mb-1 lg:mb-0.5 block">📝 Nota / Combinado</label>
+                  <input type="text" value={observacaoDireta} onChange={(e) => setObservacaoDireta(e.target.value)} placeholder="Ex: Deixou com a mãe" className="w-full p-3 lg:p-2 rounded bg-purple-50 text-purple-900 border-2 border-purple-200 font-bold text-sm outline-none focus:border-purple-500" />
+                </div>
+                {parcelasDireta > 1 && totalComDesconto > 0 && (
+                  <div className="col-span-2 bg-purple-100 p-2 rounded text-[10px] text-purple-800 font-black text-center mt-1 border border-purple-200">
+                    O carnê será gerado em {parcelasDireta}x de {formataMoeda(totalComDesconto / parcelasDireta)}
+                  </div>
+                )}
               </div>
             )}
 

@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getDadosDashboard, cancelarVendaAction, quitarVendaAction, atualizarNotaReceberAction, atualizarVendedorAction, pagarParcelaAction } from './dashboardActions';
+import { getDadosDashboard, cancelarVendaAction, quitarVendaAction, atualizarNotaReceberAction, atualizarVendedorAction, pagarParcelaAction, atualizarVendaParaParceladaAction } from './dashboardActions';
 import { getDadosFinanceiros } from './financeiro/actions'; 
 import Link from 'next/link';
 
@@ -87,10 +87,29 @@ export default function DashboardPage() {
   };
 
   const handleBaixarParcela = async (idVenda: number, atual: number, total: number, nomeCliente: string) => {
-    if (confirm(`Recebeu o pagamento da PARCELA ${atual + 1} de ${total} para o cliente ${nomeCliente}?\n\nO sistema vai descontar a parcela e agendar a próxima automaticamente.`)) {
+    if (confirm(`Recebeu o pagamento da PARCELA ${atual + 1} de ${total} para o cliente ${nomeCliente}?\n\nO sistema vai abater este valor do saldo e avançar a data de vencimento.`)) {
       await pagarParcelaAction(idVenda);
       carregar();
     }
+  };
+
+  // 🚀 BOTÃO "CONVERTER PARA CARNÊ" (Para consertar os antigos)
+  const handleConverterParaParcelas = async (idVenda: number, obsAtual: string) => {
+    const input = prompt("Esta venda antiga tem quantas parcelas no TOTAL? (Ex: 3)", "2");
+    if (!input) return;
+    const parcelas = Number(input);
+    if (isNaN(parcelas) || parcelas <= 1) return;
+
+    const dataPadrao = new Date();
+    dataPadrao.setMonth(dataPadrao.getMonth() + 1); // Sugere o próximo mês
+    const dataInput = prompt("Qual a data de vencimento da PRIMEIRA parcela? (Use o formato Ano-Mês-Dia, ex: 2026-08-20)", dataPadrao.toISOString().split('T')[0]);
+    if(!dataInput) return;
+
+    const novaNota = prompt("Anotação / Combinado:", obsAtual) || obsAtual;
+
+    await atualizarVendaParaParceladaAction(idVenda, parcelas, dataInput, novaNota);
+    alert("Venda transformada num carnê de crediário com sucesso!");
+    carregar();
   };
 
   const handleAlterarNota = async (idVenda: number, notaAtual: string) => {
@@ -573,7 +592,6 @@ export default function DashboardPage() {
           </div>
         </div>
         
-        {/* O BOTÃO FISCAL FOI REMOVIDO DAQUI CONFORME SOLICITADO */}
         <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap sm:flex-nowrap justify-end">
           <div className="flex items-center gap-2 bg-white px-3 py-2.5 rounded-xl border border-[#E0DDDD] shadow-sm flex-1 sm:flex-none">
             <span className="text-lg">📅</span>
@@ -731,17 +749,23 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ==================== ABA CONTAS A RECEBER (COM PARCELAS INTELIGENTES) ==================== */}
+      {/* ==================== ABA CONTAS A RECEBER (🚀 AGORA COM CARNÊ E BOTÃO DIVIDIR) ==================== */}
       {abaAtiva === 'receber' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300">
           <div className="mb-4">
             <h2 className="text-xl font-black text-purple-700">📑 Monitoramento Dinâmico de Contas a Receber</h2>
-            <p className="text-zinc-500 text-xs">O sistema calcula o próximo vencimento a cada 30 dias automaticamente.</p>
+            <p className="text-zinc-500 text-xs">O sistema calcula o próximo vencimento e a baixa das parcelas automaticamente.</p>
           </div>
           <div className="overflow-x-auto rounded-lg border border-[#E0DDDD]">
             <table className="w-full text-left whitespace-nowrap">
               <thead className="bg-purple-50 border-b border-purple-200">
-                <tr><th className="p-3 text-xs font-bold text-purple-900">Vencimento</th><th className="p-3 text-xs font-bold text-purple-900">Cliente</th><th className="p-3 text-xs font-bold text-purple-900">Nota de Conferência</th><th className="p-3 text-xs font-bold text-purple-900">Valor Atual</th><th className="p-3 text-xs font-bold text-purple-900 text-center">Ações</th></tr>
+                <tr>
+                  <th className="p-3 text-xs font-bold text-purple-900">Vencimento</th>
+                  <th className="p-3 text-xs font-bold text-purple-900">Cliente</th>
+                  <th className="p-3 text-xs font-bold text-purple-900">Nota de Conferência</th>
+                  <th className="p-3 text-xs font-bold text-purple-900">Valor Atual</th>
+                  <th className="p-3 text-xs font-bold text-purple-900 text-center">Ações</th>
+                </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 font-semibold text-sm">
                 {listaVendas.filter((v: any) => v.status !== 'cancelada' && (obterPagamento(v).startsWith('venda_direta') || obterPagamento(v).includes('obs='))).map((venda: any) => {
@@ -766,9 +790,14 @@ export default function DashboardPage() {
 
                       valorDaParcela = venda.total / parcelasTotal;
 
-                      const vencimento = new Date(dataBase);
-                      vencimento.setMonth(vencimento.getMonth() + parcelasPagas + 1);
-                      dataVencimentoStr = vencimento.toLocaleDateString('pt-BR');
+                      if (dataBase.includes('-')) {
+                        const [ano, mes, dia] = dataBase.split('-');
+                        const vencimento = new Date(Number(ano), Number(mes) - 1, Number(dia));
+                        vencimento.setMonth(vencimento.getMonth() + parcelasPagas);
+                        dataVencimentoStr = vencimento.toLocaleDateString('pt-BR');
+                      } else {
+                        dataVencimentoStr = new Date(dataBase).toLocaleDateString('pt-BR');
+                      }
                   }
 
                   const limpa = nota.replace(';pago=true', '').replace('pago=true', '');
@@ -794,30 +823,41 @@ export default function DashboardPage() {
                       <td className={`p-3 font-black ${quitada ? 'text-zinc-400 line-through' : 'text-purple-600'}`}>
                          {parcelasTotal > 1 ? (
                            <div className="flex flex-col">
-                             <span>{exibirMoeda(valorDaParcela)}</span>
+                             <span className="text-lg">{exibirMoeda(valorDaParcela)}</span>
                              {!quitada && (
-                               <span className="text-[9px] text-zinc-500 font-bold uppercase mt-0.5">
-                                 Parcela {parcelasPagas + 1}/${parcelasTotal}
-                               </span>
+                               <div className="flex flex-col mt-0.5">
+                                  <span className="text-[9px] text-zinc-500 font-bold uppercase">
+                                    Parcela {parcelasPagas + 1}/${parcelasTotal}
+                                  </span>
+                                  <span className="text-[9px] text-red-400 font-bold uppercase mt-0.5">
+                                    Resta do Total: {exibirMoeda(venda.total - (valorDaParcela * parcelasPagas))}
+                                  </span>
+                               </div>
                              )}
                            </div>
                          ) : (
                            exibirMoeda(venda.total)
                          )}
                       </td>
-                      <td className="p-3 text-center">
+                      <td className="p-3 text-center align-middle">
                         {quitada ? <span className="bg-green-100 text-green-700 px-3 py-1 rounded text-[10px] font-black uppercase">✅ Quitado</span> : (
-                          <div className="flex justify-center gap-2">
+                          <div className="flex flex-wrap justify-center gap-1.5 min-w-[180px] max-w-[220px]">
                             {parcelasTotal > 1 ? (
-                               <button onClick={() => handleBaixarParcela(venda.id, parcelasPagas, parcelasTotal, nome)} className="bg-purple-600 text-white text-[11px] font-black px-3 py-1.5 rounded uppercase hover:bg-purple-800 transition-colors">
-                                 💸 Baixar Parcela
+                               <button onClick={() => handleBaixarParcela(venda.id, parcelasPagas, parcelasTotal, nome)} className="bg-purple-600 text-white text-[10px] font-black px-2 py-2 rounded uppercase hover:bg-purple-800 transition-colors w-full shadow-sm">
+                                 💸 Pagar Parcela {parcelasPagas + 1}
                                </button>
                             ) : (
-                               <button onClick={() => handleQuitarConta(venda.id, nome)} className="bg-green-600 text-white text-[11px] font-black px-3 py-1.5 rounded uppercase">💰 Quitar Total</button>
+                               <button onClick={() => handleQuitarConta(venda.id, nome)} className="bg-green-600 text-white text-[10px] font-black px-2 py-2 rounded uppercase w-full shadow-sm hover:bg-green-700">💰 Quitar Total</button>
                             )}
 
-                            <button onClick={() => handleAlterarNota(venda.id, limpa)} className="bg-purple-100 text-purple-700 text-[11px] font-bold px-3 py-1.5 rounded uppercase hover:bg-purple-200">📝 Notas</button>
-                            <button onClick={() => handleEnviarCobrancaWhatsApp(venda, nome, limpa, parcelasPagas, parcelasTotal, valorDaParcela, dataVencimentoStr)} className="bg-[#25D366] text-white text-[11px] font-black px-3 py-1.5 rounded uppercase flex items-center gap-1 hover:bg-green-600">📱 Cobrar</button>
+                            {/* 🚀 BOTÃO "PARCELAR" (Mágica para as vendas antigas do sistema!) */}
+                            {parcelasTotal === 1 && (
+                               <button onClick={() => handleConverterParaParcelas(venda.id, limpa)} title="Dividir esta venda num carnê com parcelas" className="bg-blue-100 text-blue-700 text-[10px] font-black px-2 py-1.5 rounded uppercase flex-1 hover:bg-blue-200">
+                                 🔄 Parcelar
+                               </button>
+                            )}
+                            <button onClick={() => handleAlterarNota(venda.id, limpa)} className="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-1.5 rounded uppercase hover:bg-purple-200 flex-1">📝 Notas</button>
+                            <button onClick={() => handleEnviarCobrancaWhatsApp(venda, nome, limpa, parcelasPagas, parcelasTotal, valorDaParcela, dataVencimentoStr)} className="bg-[#25D366] text-white text-[10px] font-black px-2 py-1.5 rounded uppercase flex items-center justify-center gap-1 hover:bg-green-600 w-full mt-0.5 shadow-sm">📱 Enviar Cobrança</button>
                           </div>
                         )}
                       </td>
