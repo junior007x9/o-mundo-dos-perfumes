@@ -36,13 +36,15 @@ export default async function ProdutosPage({
 
   const listaProdutosCompleta = await db.select().from(produtos).orderBy(desc(produtos.id));
 
+  // 🚀 PESQUISA MELHORADA: Agora varre o nome e também a marca (descrição)!
   const listaProdutos = listaProdutosCompleta.filter((p) => {
     let textoBate = true;
     if (q) {
       const termo = q.toLowerCase();
       textoBate = p.nome.toLowerCase().includes(termo) ||
                   (p.codigoBarras?.toLowerCase().includes(termo) ?? false) ||
-                  (p.descricao?.toLowerCase().includes(termo) ?? false);
+                  (p.descricao?.toLowerCase().includes(termo) ?? false) ||
+                  (p.marca?.toLowerCase().includes(termo) ?? false);
     }
 
     let estoqueBate = true;
@@ -87,7 +89,6 @@ export default async function ProdutosPage({
     };
 
     if (id) {
-      // Pega o estoque antigo para informar na Auditoria
       const prodAntigo = await db.select().from(produtos).where(eq(produtos.id, Number(id))).limit(1);
       const estoqueAntigo = prodAntigo[0]?.estoque || 0;
 
@@ -117,7 +118,6 @@ export default async function ProdutosPage({
     redirect('/dashboard/produtos?msg=Produto guardado com sucesso no estoque!');
   }
 
-  // 🚀 LÓGICA DE EXCLUSÃO DE KITS CORRIGIDA E DETALHADA PARA A AUDITORIA
   async function excluirProduto(formData: FormData) {
     'use server';
     const usu = await getUsuarioLogado();
@@ -139,7 +139,6 @@ export default async function ProdutosPage({
         
         if (descKit.startsWith(prefixoDesc)) {
           const itensString = descKit.substring(prefixoDesc.length);
-          // 🚀 Agora reconhece o novo separador ' | ' que é muito mais seguro que a vírgula
           const separador = itensString.includes(' | ') ? ' | ' : ', ';
           const nomesDosItens = itensString.split(separador).map(n => n.trim());
           
@@ -157,7 +156,6 @@ export default async function ProdutosPage({
                 .set({ estoque: novoEstoque })
                 .where(eq(produtos.id, prodAlvo.id));
               
-              // 🚀 Registra a matemática explícita para o cliente ver!
               logsDetalhesKit.push(`[${prodAlvo.nome}: Tinha ${estoqueAntigo} ➡️ Voltou +${quantidadeDevolvida} ➡️ Agora ${novoEstoque}]`);
             }
           }
@@ -185,7 +183,6 @@ export default async function ProdutosPage({
     redirect('/dashboard/produtos?msg=Item apagado e estoque reorganizado com sucesso!');
   }
 
-  // 🚀 LÓGICA DE MONTAGEM DE KITS COM MATEMÁTICA EXPLÍCITA
   async function montarKit(formData: FormData) {
     'use server';
     const usu = await getUsuarioLogado();
@@ -224,14 +221,12 @@ export default async function ProdutosPage({
         .set({ estoque: novoEstoque })
         .where(eq(produtos.id, item.id));
 
-      // 🚀 Matemática explícita da saída
       logsDetalhesMontagem.push(`[${item.nome}: Tinha ${estoqueAntigo} ➡️ Saiu -${qtdKits} ➡️ Agora ${novoEstoque}]`);
     }
 
     await db.insert(produtos).values({
       codigoBarras: `KIT-${Date.now().toString().slice(-6)}`,
       nome: `🎁 Kit: ${nomeKit}`,
-      // 🚀 Trocamos para " | " no lugar da vírgula para evitar erros na hora de desmanchar
       descricao: `Contém: ${nomesItens.join(' | ')}`,
       precoCusto: custoTotal,
       precoVenda: precoVendaKit,
@@ -251,7 +246,6 @@ export default async function ProdutosPage({
   return (
     <div className="space-y-6 md:space-y-8">
 
-      {/* BANNERS DE ALERTA (Sucesso e Erro) */}
       {msgSucesso && (
         <div className="bg-green-100 border-l-4 border-green-500 text-green-800 p-4 rounded-r-xl shadow-sm flex justify-between items-center animate-in fade-in slide-in-from-top-2">
           <div className="flex items-center gap-3">
@@ -287,10 +281,8 @@ export default async function ProdutosPage({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         
-        {/* COLUNA ESQUERDA: Formulários */}
         <div className="flex flex-col gap-6 h-fit lg:sticky lg:top-8">
           
-          {/* FORMULÁRIO DE CADASTRO / EDIÇÃO */}
           <div className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-[#E0DDDD] relative overflow-hidden">
             <div className={`absolute top-0 left-0 w-full h-1.5 ${produtoEditando ? 'bg-amber-500' : 'bg-[#6A283A]'}`}></div>
             
@@ -352,7 +344,6 @@ export default async function ProdutosPage({
             </form>
           </div>
 
-          {/* FORMULÁRIO DE MONTAR KIT */}
           {!produtoEditando && (
             <div className="bg-amber-50 p-5 md:p-6 rounded-xl shadow-sm border border-amber-200 relative overflow-hidden">
               <h2 className="text-xl font-black text-amber-800 flex items-center gap-2 mb-4">
@@ -404,7 +395,6 @@ export default async function ProdutosPage({
           )}
         </div>
 
-        {/* COLUNA DIREITA: Tabela/Cards */}
         <div className="lg:col-span-2 bg-white p-4 md:p-6 rounded-xl shadow-sm border border-[#E0DDDD]">
           
           <div className="flex flex-col xl:flex-row xl:justify-between xl:items-center gap-4 mb-6">
@@ -412,11 +402,9 @@ export default async function ProdutosPage({
               <span>📋</span> Estoque Atual
             </h2>
 
-            {/* O Campo Inteligente com o Filtro de Estoque Embutido */}
-            <InputPesquisa />
+            <InputPesquisa placeholder="Pesquisar nome ou marca..." />
           </div>
           
-          {/* COMPUTADOR */}
           <div className="hidden md:block overflow-x-auto rounded-lg border border-[#E0DDDD]">
             <table className="w-full text-left whitespace-nowrap md:whitespace-normal">
               <thead>
@@ -432,7 +420,12 @@ export default async function ProdutosPage({
                   <tr key={p.id} className={`${p.nome.startsWith('🎁') ? 'bg-amber-50/50' : 'hover:bg-[#EED9D4]/10'} transition-colors group`}>
                     <td className="p-3">
                       <p className="font-bold text-zinc-800 text-sm md:text-base">{p.nome}</p>
-                      <p className="text-xs text-zinc-500 mt-0.5">{p.descricao}</p>
+                      
+                      {/* 🚀 VISUAL NA TABELA: Mostra a marca/descrição em destaque roxo! */}
+                      {(p.marca || p.descricao) && (
+                        <p className="text-[10px] font-black text-purple-600 uppercase mt-1">{p.marca || p.descricao}</p>
+                      )}
+
                       {p.codigoBarras && (
                         <div className="mt-1.5 flex items-center gap-1.5">
                           <span className="bg-zinc-100 border border-zinc-200 text-zinc-600 px-2 py-0.5 rounded text-[10px] md:text-xs font-mono font-bold">📍 {p.codigoBarras}</span>
@@ -471,14 +464,18 @@ export default async function ProdutosPage({
             </table>
           </div>
 
-          {/* CELULAR */}
           <div className="block md:hidden space-y-3">
             {listaProdutos.map((p) => (
               <div key={`card-${p.id}`} className={`p-4 rounded-xl border shadow-sm flex flex-col justify-between gap-3 ${p.nome.startsWith('🎁') ? 'bg-amber-50/60 border-amber-200' : 'bg-white border-[#E0DDDD]'}`}>
                 <div className="flex justify-between items-start gap-2">
                   <div className="flex-1 min-w-0">
                     <p className="font-black text-zinc-800 text-base truncate">{p.nome}</p>
-                    <p className="text-xs text-zinc-500 font-medium mt-0.5 line-clamp-2">{p.descricao}</p>
+                    
+                    {/* Visual na versão Mobile da Tabela */}
+                    {(p.marca || p.descricao) && (
+                        <p className="text-[10px] font-black text-purple-600 uppercase mt-0.5 line-clamp-1">{p.marca || p.descricao}</p>
+                    )}
+
                     {p.codigoBarras && (
                       <span className="inline-block mt-1 bg-zinc-100 border border-zinc-200 text-zinc-600 px-2 py-0.5 rounded text-[10px] font-mono font-bold">📍 {p.codigoBarras}</span>
                     )}
@@ -515,7 +512,6 @@ export default async function ProdutosPage({
             ))}
           </div>
 
-          {/* MENSAGEM SE A PESQUISA NÃO ENCONTRAR NADA */}
           {listaProdutos.length === 0 && (
             <div className="p-8 text-center bg-zinc-50 border border-dashed border-zinc-200 rounded-xl mt-4">
               <div className="text-4xl mb-3 opacity-50">📭</div>

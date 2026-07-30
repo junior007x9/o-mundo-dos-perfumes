@@ -39,9 +39,6 @@ export default function CaixaPage() {
   const [valoresMultiplos, setValoresMultiplos] = useState({ dinheiro: '', pix: '', credito: '', debito: '' });
   
   const [observacaoDireta, setObservacaoDireta] = useState('');
-  // 🚀 NOVO CAMPO PARA DEFINIR A QUANTIDADE DE PARCELAS NO FIADO
-  const [parcelasDireta, setParcelasDireta] = useState<number>(1); 
-  
   const [observacaoMultipla, setObservacaoMultipla] = useState(''); 
 
   const [modalFechamento, setModalFechamento] = useState(false);
@@ -207,7 +204,7 @@ export default function CaixaPage() {
     const prodEncontrado = produtos.find(p => 
       p.codigoBarras === termoBusca || 
       String(p.nome || '').toLowerCase().includes(termo) ||
-      String(p.marca || '').toLowerCase().includes(termo) ||
+      String(p.marca || p.descricao || '').toLowerCase().includes(termo) ||
       String(p.precoVenda || '').includes(termo)
     );
     if (prodEncontrado) {
@@ -239,20 +236,17 @@ export default function CaixaPage() {
   const botaoDesabilitado = carrinho.length === 0 || 
     (pagamento === 'multiplo' ? !multiploValido : 
     (pagamento === 'dinheiro' && valorRecebido !== '' && Number(valorRecebido) < totalComDesconto) ||
-    (pagamento === 'venda_direta' && (!clienteSelecionado || parcelasDireta < 1))); 
+    (pagamento === 'venda_direta' && !clienteSelecionado)); 
 
   const handleFinalizarVenda = async () => {
     if (carrinho.length === 0 || processandoVenda) return;
     setProcessandoVenda(true);
 
     try {
-      const dataHoje = new Date().toISOString().split('T')[0];
-
-      // 🚀 SALVA A INFORMAÇÃO COMPLETA DAS PARCELAS PARA O SISTEMA AUTOMATIZAR DEPOIS
       const formaEnvio = pagamento === 'multiplo'
         ? `multiplo:dinheiro=${(Number(valoresMultiplos.dinheiro) || 0) - trocoMultiplo};pix=${Number(valoresMultiplos.pix) || 0};credito=${Number(valoresMultiplos.credito) || 0};debito=${Number(valoresMultiplos.debito) || 0}${observacaoMultipla.trim() ? `;obs=${observacaoMultipla.replace(/[:;=]/g, ' ')}` : ''}`
-        : pagamento === 'venda_direta'
-          ? `venda_direta:parcelas=${parcelasDireta}:pagas=0:data=${dataHoje}:obs=${observacaoDireta.replace(/[:;=]/g, ' ')}`
+        : pagamento === 'venda_direta' && observacaoDireta.trim()
+          ? `venda_direta:obs=${observacaoDireta.replace(/[:;=]/g, ' ')}`
           : pagamento;
 
       const clienteObj = clientesDB.find(c => c.id.toString() === clienteSelecionado);
@@ -279,7 +273,6 @@ export default function CaixaPage() {
       setDesconto('');
       setValoresMultiplos({ dinheiro: '', pix: '', credito: '', debito: '' });
       setObservacaoDireta('');
-      setParcelasDireta(1);
       setObservacaoMultipla(''); 
       setPagamento('dinheiro');
       setClienteSelecionado(''); 
@@ -365,13 +358,14 @@ export default function CaixaPage() {
     setModalFechamento(false);
   };
 
+  // 🚀 PESQUISA MELHORADA: Busca no Nome e na Marca (Descrição)
   const produtosFiltrados = produtos.filter((p) => {
     if (!buscaTexto.trim()) return true;
     const termo = buscaTexto.toLowerCase();
     
     const matchNome = String(p.nome || '').toLowerCase().includes(termo);
     const matchBarra = String(p.codigoBarras || '').toLowerCase().includes(termo);
-    const matchMarca = String(p.marca || '').toLowerCase().includes(termo);
+    const matchMarca = String(p.marca || p.descricao || '').toLowerCase().includes(termo);
     const matchPreco = String(p.precoVenda || '').includes(termo);
 
     return matchNome || matchBarra || matchMarca || matchPreco;
@@ -516,7 +510,7 @@ export default function CaixaPage() {
           </div>
           <input 
             ref={inputBuscaRef} type="text" value={buscaTexto} onChange={(e) => setBuscaTexto(e.target.value)}
-            placeholder="Buscar por nome, marca, código..."
+            placeholder="Buscar por nome, marca ou código..."
             className="w-full pl-12 pr-4 py-3 md:py-3 border border-[#E0DDDD] rounded-lg focus:ring-2 focus:ring-[#6A283A] outline-none font-bold text-sm md:text-base transition-all"
             autoFocus
           />
@@ -537,12 +531,15 @@ export default function CaixaPage() {
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2">
               {produtosFiltrados.map((p) => (
                 <button key={p.id} onClick={() => adicionarAoCarrinho(p)} disabled={p.estoque <= 0} className={`p-3 border-2 rounded-xl text-left transition-all flex flex-col justify-between ${p.estoque > 0 ? 'border-[#E0DDDD] hover:border-[#6A283A] bg-white hover:bg-[#f9f1f0] active:scale-95 shadow-sm' : 'border-zinc-200 opacity-50 bg-zinc-100 cursor-not-allowed'}`}>
-                  <div>
+                  
+                  {/* 🚀 VISUAL DOS CARDS: Nome + Marca fixos e alinhados! */}
+                  <div className="w-full">
                     <h3 className="font-bold text-zinc-900 text-xs md:text-sm leading-tight line-clamp-2 h-8">{p.nome}</h3>
-                    {p.marca && <p className="text-[9px] md:text-[10px] font-black text-purple-600 uppercase mt-0.5 line-clamp-1">{p.marca}</p>}
-                    <p className="text-[10px] md:text-xs font-semibold text-zinc-500 mt-1">Estoque: {p.estoque}</p>
+                    <p className="text-[9px] md:text-[10px] font-black text-purple-600 uppercase mt-1 line-clamp-1 h-3">{p.marca || p.descricao || ' '}</p>
+                    <p className="text-[10px] md:text-xs font-semibold text-zinc-500 mt-2">Estoque: {p.estoque}</p>
                   </div>
-                  <p className="text-sm md:text-base font-black text-[#6A283A] mt-1.5 border-t border-zinc-100 pt-1 w-full">{formataMoeda(p.precoVenda)}</p>
+
+                  <p className="text-sm md:text-base font-black text-[#6A283A] mt-2 border-t border-zinc-100 pt-1.5 w-full">{formataMoeda(p.precoVenda)}</p>
                 </button>
               ))}
               {produtosFiltrados.length === 0 && (
@@ -573,7 +570,13 @@ export default function CaixaPage() {
                 <div key={item.id} className="flex justify-between items-center bg-white p-2.5 rounded-lg border border-zinc-200 shadow-sm">
                   <div className="flex-1 pr-2">
                     <p className="font-bold text-zinc-800 text-xs md:text-sm leading-tight">{item.nome}</p>
-                    <p className="text-[11px] md:text-xs text-zinc-500 mt-0.5"><strong>{item.quantidade}x</strong> {formataMoeda(item.precoVenda)}</p>
+                    
+                    {/* Exibe a Marca/Descrição também no carrinho para confirmar */}
+                    {(item.marca || item.descricao) && (
+                      <p className="text-[9px] font-black text-purple-600 uppercase mt-0.5 line-clamp-1">{item.marca || item.descricao}</p>
+                    )}
+
+                    <p className="text-[11px] md:text-xs text-zinc-500 mt-1"><strong>{item.quantidade}x</strong> {formataMoeda(item.precoVenda)}</p>
                   </div>
                   <div className="flex items-center gap-3 pl-2 border-l border-zinc-100">
                     <span className="font-black text-[#6A283A] text-sm whitespace-nowrap">{formataMoeda(item.quantidade * item.precoVenda)}</span>
@@ -602,7 +605,7 @@ export default function CaixaPage() {
                   <button type="button" onClick={() => setModalCliente(true)} className="text-[9px] font-black text-white bg-[#6A283A] px-2 py-1 lg:px-1.5 lg:py-0.5 rounded uppercase shadow-sm">➕ Novo</button>
                 </div>
                 <select value={clienteSelecionado} onChange={(e) => setClienteSelecionado(e.target.value)} className="w-full p-3 lg:p-2 rounded bg-zinc-50 font-bold border border-zinc-300 outline-none text-zinc-800 text-sm lg:text-xs">
-                  <option value="">👤 Selecione...</option>
+                  <option value="">👤 Consumidor Final</option>
                   {clientesDB.map(c => <option key={c.id} value={c.id}>{c.nome.substring(0, 15)}</option>)}
                 </select>
               </div>
@@ -615,27 +618,15 @@ export default function CaixaPage() {
                 <option value="pix">💠 PIX</option>
                 <option value="credito">💳 Cartão de Crédito</option>
                 <option value="debito">💳 Cartão de Débito</option>
-                <option value="venda_direta">📝 Venda Direta (Fiado/Crediário)</option>
+                <option value="venda_direta">📝 Venda Direta (Parcelado)</option>
                 <option value="multiplo">🔀 Múltiplas Formas (Dividir)</option>
               </select>
             </div>
 
-            {/* 🚀 FORMULÁRIO DE FIADO/CREDIÁRIO (AGORA COM PARCELAMENTO) */}
             {pagamento === 'venda_direta' && (
-              <div className="mb-3 lg:mb-2 animate-in fade-in duration-200 grid grid-cols-2 gap-2">
-                <div className="col-span-2 lg:col-span-1">
-                  <label className="text-[11px] lg:text-[10px] font-bold text-purple-700 uppercase mb-1 lg:mb-0.5 block">Nº de Parcelas</label>
-                  <input type="number" min="1" max="12" value={parcelasDireta} onChange={(e) => setParcelasDireta(Number(e.target.value))} className="w-full p-3 lg:p-2 rounded bg-purple-50 text-purple-900 border-2 border-purple-200 font-bold text-sm outline-none focus:border-purple-500" />
-                </div>
-                <div className="col-span-2 lg:col-span-1">
-                  <label className="text-[11px] lg:text-[10px] font-bold text-purple-700 uppercase mb-1 lg:mb-0.5 block">📝 Nota / Combinado</label>
-                  <input type="text" value={observacaoDireta} onChange={(e) => setObservacaoDireta(e.target.value)} placeholder="Ex: Deixou com a mãe" className="w-full p-3 lg:p-2 rounded bg-purple-50 text-purple-900 border-2 border-purple-200 font-bold text-sm outline-none focus:border-purple-500" />
-                </div>
-                {parcelasDireta > 1 && totalComDesconto > 0 && (
-                  <div className="col-span-2 bg-purple-100 p-2 rounded text-[10px] text-purple-800 font-black text-center mt-1">
-                    Serão {parcelasDireta}x de {formataMoeda(totalComDesconto / parcelasDireta)}
-                  </div>
-                )}
+              <div className="mb-3 lg:mb-2 animate-in fade-in duration-200">
+                <label className="text-[11px] lg:text-[10px] font-bold text-purple-700 uppercase mb-1 lg:mb-0.5 block">📝 Nota / Parcelas (Oculto no cupom)</label>
+                <input type="text" value={observacaoDireta} onChange={(e) => setObservacaoDireta(e.target.value)} placeholder="Ex: Combinado 3x de R$ 50 no dia 10" className="w-full p-3 lg:p-2 rounded bg-purple-50 text-purple-900 border-2 border-purple-200 font-bold text-sm lg:text-xs outline-none focus:border-purple-500" />
               </div>
             )}
 
