@@ -728,4 +728,3 @@ export default function CaixaPage() {
       </div>
     </div>
   );
-}
