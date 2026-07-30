@@ -42,7 +42,6 @@ export async function getDadosDashboard() {
   };
 }
 
-// 🚀 LÓGICA DE ESTORNO ATUALIZADA: Agora grava a matemática exata do estoque
 export async function cancelarVendaAction(idVenda: number) {
   const usu = await getUsuarioLogado();
   const nomeUsuario = usu?.nome || 'Sistema';
@@ -64,14 +63,12 @@ export async function cancelarVendaAction(idVenda: number) {
         .set({ estoque: novoEstoque })
         .where(eq(produtos.id, item.idProduto));
       
-      // Armazena a contagem para mostrar na auditoria
       logsDetalhesEstorno.push(`[${produtoAtual.nome}: Tinha ${estoqueAntigo} ➡️ Voltou +${quantidadeDevolvida} ➡️ Agora ${novoEstoque}]`);
     }
   }
 
   await db.update(vendas).set({ status: 'cancelada' }).where(eq(vendas.id, idVenda));
 
-  // Junta todos os produtos que voltaram na mesma frase
   const detalheLog = logsDetalhesEstorno.length > 0 ? logsDetalhesEstorno.join(' | ') : 'Nenhum produto rastreável';
 
   await db.insert(logsSistema).values({
@@ -108,6 +105,43 @@ export async function quitarVendaAction(idVenda: number) {
   revalidatePath('/dashboard');
 }
 
+// 🚀 NOVA FUNÇÃO: Dar Baixa Apenas em Uma Parcela
+export async function pagarParcelaAction(idVenda: number) {
+  const usu = await getUsuarioLogado();
+  const nomeUsuario = usu?.nome || 'Sistema';
+
+  const resVenda = await db.select().from(vendas).where(eq(vendas.id, idVenda)).limit(1);
+  if (!resVenda.length) return;
+  
+  let forma = String(resVenda[0].formaPagamento);
+  const matchP = forma.match(/parcelas=(\d+)/);
+  const matchPg = forma.match(/pagas=(\d+)/);
+
+  if (matchP && matchPg) {
+    const parcelasTotal = Number(matchP[1]);
+    const parcelasPagas = Number(matchPg[1]) + 1; // Avança uma parcela
+
+    // Atualiza a contagem na string
+    forma = forma.replace(`pagas=${matchPg[1]}`, `pagas=${parcelasPagas}`);
+
+    // Se atingiu o total de parcelas, quita a venda de vez
+    if (parcelasPagas >= parcelasTotal) {
+      forma += ';pago=true';
+    }
+
+    await db.update(vendas).set({ formaPagamento: forma }).where(eq(vendas.id, idVenda));
+
+    await db.insert(logsSistema).values({
+      descricao: `💰 Parcela ${parcelasPagas}/${parcelasTotal} da Venda #${idVenda} foi recebida e baixada no sistema.`,
+      data: new Date().toISOString(),
+      categoria: 'venda',
+      usuarioNome: nomeUsuario
+    });
+  }
+
+  revalidatePath('/dashboard');
+}
+
 export async function atualizarNotaReceberAction(idVenda: number, novaNota: string) {
   const usu = await getUsuarioLogado();
   const nomeUsuario = usu?.nome || 'Sistema';
@@ -117,14 +151,21 @@ export async function atualizarNotaReceberAction(idVenda: number, novaNota: stri
 
   if (vendaAtual) {
     const formaSegura = String(vendaAtual.formaPagamento || '');
-    const formaLimpa = formaSegura.split(';obs=')[0].split(':obs=')[0];
-    const prefixo = formaSegura.startsWith('venda_direta') ? 'venda_direta:obs=' : `${formaLimpa};obs=`;
-    const novaForma = `${prefixo}${novaNota.replace(/[:;=]/g, ' ')}`;
-
-    await db.update(vendas).set({ formaPagamento: novaForma }).where(eq(vendas.id, idVenda));
+    
+    // Tratamento inteligente para não apagar a regra de parcelas
+    if (formaSegura.includes(':parcelas=')) {
+       const parteSemObs = formaSegura.split(':obs=')[0];
+       const novaForma = `${parteSemObs}:obs=${novaNota.replace(/[:;=]/g, ' ')}`;
+       await db.update(vendas).set({ formaPagamento: novaForma }).where(eq(vendas.id, idVenda));
+    } else {
+       const formaLimpa = formaSegura.split(';obs=')[0].split(':obs=')[0];
+       const prefixo = formaSegura.startsWith('venda_direta') ? 'venda_direta:obs=' : `${formaLimpa};obs=`;
+       const novaForma = `${prefixo}${novaNota.replace(/[:;=]/g, ' ')}`;
+       await db.update(vendas).set({ formaPagamento: novaForma }).where(eq(vendas.id, idVenda));
+    }
 
     await db.insert(logsSistema).values({
-      descricao: `📝 Histórico de parcelas da Venda #${idVenda} modificado para: "${novaNota}".`,
+      descricao: `📝 Histórico de anotações da Venda #${idVenda} modificado.`,
       data: new Date().toISOString(),
       categoria: 'venda',
       usuarioNome: nomeUsuario

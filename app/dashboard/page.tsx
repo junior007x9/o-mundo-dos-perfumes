@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getDadosDashboard, cancelarVendaAction, quitarVendaAction, atualizarNotaReceberAction, atualizarVendedorAction } from './dashboardActions';
+import { getDadosDashboard, cancelarVendaAction, quitarVendaAction, atualizarNotaReceberAction, atualizarVendedorAction, pagarParcelaAction } from './dashboardActions';
 import { getDadosFinanceiros } from './financeiro/actions'; 
 import Link from 'next/link';
 
@@ -79,15 +79,22 @@ export default function DashboardPage() {
   };
 
   const handleQuitarConta = async (idVenda: number, nomeCliente: string) => {
-    if (confirm(`Confirmar liquidação total para ${nomeCliente}?\n\nO valor sairá da lista de pendentes e será marcado como recebido.`)) {
+    if (confirm(`Confirmar liquidação TOTAL para ${nomeCliente}?\n\nO valor sairá da lista de pendentes e será marcado como recebido.`)) {
       await quitarVendaAction(idVenda);
       alert('Conta baixada com sucesso! 🎉');
       carregar();
     }
   };
 
+  const handleBaixarParcela = async (idVenda: number, atual: number, total: number, nomeCliente: string) => {
+    if (confirm(`Recebeu o pagamento da PARCELA ${atual + 1} de ${total} para o cliente ${nomeCliente}?\n\nO sistema vai descontar a parcela e agendar a próxima automaticamente.`)) {
+      await pagarParcelaAction(idVenda);
+      carregar();
+    }
+  };
+
   const handleAlterarNota = async (idVenda: number, notaAtual: string) => {
-    const novaNota = prompt("Atualize o histórico do pagamento (Ex: Pagou R$100, faltam 2x):", notaAtual);
+    const novaNota = prompt("Atualize a observação deste crediário:", notaAtual);
     if (novaNota !== null) {
       await atualizarNotaReceberAction(idVenda, novaNota);
       alert('Histórico atualizado!');
@@ -95,7 +102,7 @@ export default function DashboardPage() {
     }
   };
 
-  const handleEnviarCobrancaWhatsApp = (venda: any, nomeCliente: string, notaInterna: string) => {
+  const handleEnviarCobrancaWhatsApp = (venda: any, nomeCliente: string, notaInterna: string, parcelaAtual?: number, totalParcelas?: number, valorDaParcela?: number, dataVencimento?: string) => {
     let telefone = '';
     if (venda.idCliente && dados?.listaClientes) {
       const cObj = dados.listaClientes.find((c: any) => Number(c.id) === Number(venda.idCliente));
@@ -106,7 +113,17 @@ export default function DashboardPage() {
     if (telefone && !telefone.startsWith('55') && telefone.length >= 10) {
       telefone = '55' + telefone;
     }
-    const textoCobranca = `*O MUNDO DOS PERFUMES* 🛍️\n\nOlá, *${nomeCliente}*! Tudo bem?\n\nPassando para lembrar do seu pagamento pendente no valor de *${formataMoeda(venda.total)}*.\n\n*Anotação do combinado:* _${notaInterna}_\n\nSe precisar da nossa chave PIX ou tiver qualquer dúvida sobre as parcelas, basta responder por aqui. Muito obrigado! ✨`;
+
+    let textoCobranca = `*O MUNDO DOS PERFUMES* 🛍️\n\nOlá, *${nomeCliente}*! Tudo bem?\n\n`;
+    
+    if (totalParcelas && totalParcelas > 1 && parcelaAtual !== undefined) {
+      textoCobranca += `Passando para lembrar do vencimento da sua *Parcela ${parcelaAtual + 1}/${totalParcelas}* no valor de *${formataMoeda(valorDaParcela || 0)}*`;
+      if (dataVencimento) textoCobranca += ` que vence em *${dataVencimento}*.`;
+    } else {
+      textoCobranca += `Passando para lembrar do seu pagamento pendente no valor de *${formataMoeda(venda.total)}*.`;
+    }
+
+    textoCobranca += `\n\n*Combinado:* _${notaInterna}_\n\nSe precisar da nossa chave PIX, basta responder por aqui. Muito obrigado! ✨`;
     window.open(`https://wa.me/${telefone}?text=${encodeURIComponent(textoCobranca)}`, '_blank');
   };
 
@@ -142,9 +159,9 @@ export default function DashboardPage() {
       if (pag.includes(':obs=')) {
         const obsExtraida = pag.split(':obs=')[1];
         const limpaObs = obsExtraida.replace(';pago=true', '').replace('pago=true', '');
-        return `VENDA DIRETA 📝 (${limpaObs})`;
+        return `FIADO/CREDIÁRIO 📝 (${limpaObs})`;
       }
-      return 'VENDA DIRETA 📝';
+      return 'FIADO/CREDIÁRIO 📝';
     }
     return pag.toUpperCase();
   };
@@ -544,138 +561,6 @@ export default function DashboardPage() {
     popup.document.close();
   };
 
-  // =========================================================================================
-  // 🚀 NOVO: EXPORTAÇÃO PDF CONTÁBIL (SOMENTE CNPJ)
-  // =========================================================================================
-  const exportarRelatorioContadorPDF = () => {
-    // Isola apenas as vendas válidas do mês selecionado
-    const vendasParaContador = vendasValidasMes.map((v: any) => {
-      const formaStr = String(v.formaPagamento).toLowerCase();
-      let valorCNPJ = 0;
-      let descricoesForma: string[] = [];
-
-      // Filtra exatamente as modalidades que passam pela conta bancária
-      if (formaStr === 'pix') { 
-        valorCNPJ = v.total; 
-        descricoesForma.push('PIX'); 
-      }
-      else if (formaStr === 'credito') { 
-        valorCNPJ = v.total; 
-        descricoesForma.push('Cartão de Crédito'); 
-      }
-      else if (formaStr === 'debito') { 
-        valorCNPJ = v.total; 
-        descricoesForma.push('Cartão de Débito'); 
-      }
-      else if (formaStr.startsWith('multiplo:')) {
-        const partes = formaStr.replace('multiplo:', '').split(';');
-        for (const parte of partes) {
-          const [tipo, valor] = parte.split('=');
-          const valNum = Number(valor) || 0;
-          if (valNum > 0) {
-            if (tipo === 'pix') { valorCNPJ += valNum; descricoesForma.push(`PIX (${formataMoeda(valNum)})`); }
-            if (tipo === 'credito') { valorCNPJ += valNum; descricoesForma.push(`Crédito (${formataMoeda(valNum)})`); }
-            if (tipo === 'debito') { valorCNPJ += valNum; descricoesForma.push(`Débito (${formataMoeda(valNum)})`); }
-          }
-        }
-      }
-
-      return {
-        ...v,
-        valorCNPJ,
-        textoFormasCNPJ: descricoesForma.join(' + ')
-      };
-    }).filter((v: any) => v.valorCNPJ > 0); // Exclui tudo que foi puramente Dinheiro ou Venda Direta
-
-    if (vendasParaContador.length === 0) {
-      return alert('Não há vendas registradas via PIX ou Cartão (CNPJ) para o mês selecionado.');
-    }
-
-    const popup = window.open('', '_blank', 'width=1000,height=1000');
-    if (!popup) return alert('Por favor, autorize pop-ups no seu navegador para emitir o PDF!');
-
-    const dataEmissao = new Date().toLocaleString('pt-BR');
-    const mesNome = mesSelecionado.split('-').reverse().join('/');
-    const totalFiscalCalculado = vendasParaContador.reduce((acc: number, v: any) => acc + v.valorCNPJ, 0);
-
-    const linhasTabela = vendasParaContador.map((v: any) => `
-      <tr>
-        <td>${new Date(v.data).toLocaleString('pt-BR')}</td>
-        <td><strong>#${v.id}</strong></td>
-        <td>${v.textoFormasCNPJ}</td>
-        <td class="right bold">${formataMoeda(v.valorCNPJ)}</td>
-      </tr>
-    `).join('');
-
-    popup.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Relatório Fiscal - ${mesNome}</title>
-          <style>
-            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
-            @page { size: A4; margin: 15mm; }
-            body { font-family: 'Inter', sans-serif; color: #1e293b; margin: 0; padding: 0; font-size: 10pt; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .header { border-bottom: 2px solid #0f172a; padding-bottom: 15px; margin-bottom: 30px; }
-            h1 { color: #0f172a; margin: 0 0 5px 0; font-size: 18pt; font-weight: 900; text-transform: uppercase; letter-spacing: -0.5px; }
-            p { margin: 0; color: #475569; font-size: 10pt; }
-            .resumo { display: flex; gap: 15px; margin-bottom: 30px; }
-            .card { flex: 1; padding: 15px; border-radius: 6px; border: 1px solid #cbd5e1; background: #f8fafc; }
-            .card-title { font-size: 8pt; text-transform: uppercase; font-weight: 700; color: #475569; margin-bottom: 8px; }
-            .card-value { font-size: 18pt; font-weight: 900; color: #0f172a; }
-            table { width: 100%; border-collapse: collapse; font-size: 9pt; }
-            th { background: #f1f5f9; color: #0f172a; padding: 10px 12px; font-weight: 700; text-transform: uppercase; font-size: 8pt; text-align: left; border-bottom: 2px solid #cbd5e1; }
-            td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
-            .right { text-align: right; } .bold { font-weight: bold; } 
-            .total-row td { border-top: 2px solid #0f172a; color: #0f172a; padding: 15px 12px; font-size: 11pt; background: #f8fafc; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div style="float: right; text-align: right;">
-              <p>Competência: <strong>${mesNome}</strong></p>
-              <p>Emitido: <strong>${dataEmissao}</strong></p>
-            </div>
-            <h1>RELATÓRIO FISCAL - CNPJ</h1>
-            <p>O MUNDO DOS PERFUMES</p>
-          </div>
-          
-          <div class="resumo">
-            <div class="card">
-              <div class="card-title">Total via PIX</div>
-              <div class="card-value">${formataMoeda(mesPix)}</div>
-            </div>
-            <div class="card">
-              <div class="card-title">Total Cartão (Débito)</div>
-              <div class="card-value">${formataMoeda(mesDebito)}</div>
-            </div>
-            <div class="card">
-              <div class="card-title">Total Cartão (Crédito)</div>
-              <div class="card-value">${formataMoeda(mesCredito)}</div>
-            </div>
-          </div>
-
-          <div style="background: #0f172a; color: #fff; padding: 15px; border-radius: 6px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-size: 9pt; text-transform: uppercase; font-weight: 700;">Base de Cálculo (Total CNPJ)</div>
-            <div style="font-size: 18pt; font-weight: 900;">${formataMoeda(totalFiscalCalculado)}</div>
-          </div>
-
-          <h3 style="color: #0f172a; font-size: 11pt; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-bottom: 15px;">Detalhamento das Operações (PIX / Cartões)</h3>
-          <table>
-            <thead><tr><th style="width: 20%;">Data/Hora</th><th style="width: 15%;">Nº Cupom</th><th style="width: 45%;">Origem Fiscal (Forma)</th><th style="width: 20%;" class="right">Valor R$</th></tr></thead>
-            <tbody>
-              ${linhasTabela}
-              <tr class="total-row bold"><td colspan="3" class="right">TOTAL TRIBUTÁVEL:</td><td class="right">${formataMoeda(totalFiscalCalculado)}</td></tr>
-            </tbody>
-          </table>
-          <div style="text-align: center; margin-top: 40px; font-size: 8pt; color: #94a3b8;">Documento de uso gerencial e contábil. Dinheiro físico e valores pendentes foram excluídos.</div>
-          <script>window.onload = function() { setTimeout(() => { window.print(); }, 300); }</script>
-        </body>
-      </html>
-    `);
-    popup.document.close();
-  };
-
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
       
@@ -688,7 +573,7 @@ export default function DashboardPage() {
           </div>
         </div>
         
-        {/* 🚀 BOTÃO RELATÓRIO DO CONTADOR ADICIONADO AQUI! */}
+        {/* O BOTÃO FISCAL FOI REMOVIDO DAQUI CONFORME SOLICITADO */}
         <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap sm:flex-nowrap justify-end">
           <div className="flex items-center gap-2 bg-white px-3 py-2.5 rounded-xl border border-[#E0DDDD] shadow-sm flex-1 sm:flex-none">
             <span className="text-lg">📅</span>
@@ -699,14 +584,6 @@ export default function DashboardPage() {
               className="bg-transparent text-sm font-black text-[#6A283A] outline-none cursor-pointer w-full"
             />
           </div>
-          
-          <button 
-            onClick={exportarRelatorioContadorPDF} 
-            title="Gera um PDF somente com PIX e Cartões para pagar o imposto"
-            className="bg-zinc-800 text-white flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-black transition-all shadow-sm hover:bg-zinc-700 flex-1 sm:flex-none"
-          >
-            🖨️ Relatório Contador
-          </button>
 
           <button 
             onClick={handleAlternarPrivacidade}
@@ -854,38 +731,93 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ==================== ABA CONTAS A RECEBER ==================== */}
+      {/* ==================== ABA CONTAS A RECEBER (COM PARCELAS INTELIGENTES) ==================== */}
       {abaAtiva === 'receber' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#E0DDDD] animate-in fade-in duration-300">
           <div className="mb-4">
             <h2 className="text-xl font-black text-purple-700">📑 Monitoramento Dinâmico de Contas a Receber</h2>
-            <p className="text-zinc-500 text-xs">Exibe todos os pendentes ativos, independente do mês.</p>
+            <p className="text-zinc-500 text-xs">O sistema calcula o próximo vencimento a cada 30 dias automaticamente.</p>
           </div>
           <div className="overflow-x-auto rounded-lg border border-[#E0DDDD]">
             <table className="w-full text-left whitespace-nowrap">
               <thead className="bg-purple-50 border-b border-purple-200">
-                <tr><th className="p-3 text-xs font-bold text-purple-900">Data</th><th className="p-3 text-xs font-bold text-purple-900">Cliente</th><th className="p-3 text-xs font-bold text-purple-900">Nota de Conferência</th><th className="p-3 text-xs font-bold text-purple-900">Devedor</th><th className="p-3 text-xs font-bold text-purple-900 text-center">Ações</th></tr>
+                <tr><th className="p-3 text-xs font-bold text-purple-900">Vencimento</th><th className="p-3 text-xs font-bold text-purple-900">Cliente</th><th className="p-3 text-xs font-bold text-purple-900">Nota de Conferência</th><th className="p-3 text-xs font-bold text-purple-900">Valor Atual</th><th className="p-3 text-xs font-bold text-purple-900 text-center">Ações</th></tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 font-semibold text-sm">
                 {listaVendas.filter((v: any) => v.status !== 'cancelada' && (obterPagamento(v).startsWith('venda_direta') || obterPagamento(v).includes('obs='))).map((venda: any) => {
                   let nota = 'Nota Geral de Balcão';
-                  if (venda.formaPagamento.includes('obs=')) nota = venda.formaPagamento.match(/obs=([^;]+)/)?.[1] || nota;
-                  else if (venda.formaPagamento.includes(':obs=')) nota = venda.formaPagamento.split(':obs=')[1];
+                  let parcelasTotal = 1;
+                  let parcelasPagas = 0;
+                  let dataVencimentoStr = '';
+                  let valorDaParcela = venda.total;
+                  
+                  if (venda.formaPagamento.includes('obs=')) {
+                      nota = venda.formaPagamento.match(/obs=([^;]+)/)?.[1] || nota;
+                  }
+
+                  if (venda.formaPagamento.includes(':parcelas=')) {
+                      const matchP = venda.formaPagamento.match(/parcelas=(\d+)/);
+                      const matchPg = venda.formaPagamento.match(/pagas=(\d+)/);
+                      const matchD = venda.formaPagamento.match(/data=([^:]+)/);
+                      
+                      parcelasTotal = matchP ? Number(matchP[1]) : 1;
+                      parcelasPagas = matchPg ? Number(matchPg[1]) : 0;
+                      const dataBase = matchD ? matchD[1] : venda.data.split('T')[0];
+
+                      valorDaParcela = venda.total / parcelasTotal;
+
+                      const vencimento = new Date(dataBase);
+                      vencimento.setMonth(vencimento.getMonth() + parcelasPagas + 1);
+                      dataVencimentoStr = vencimento.toLocaleDateString('pt-BR');
+                  }
+
                   const limpa = nota.replace(';pago=true', '').replace('pago=true', '');
                   const quitada = venda.formaPagamento.includes('pago=true');
                   const nome = clientNameMapSecure.get(Number(venda.idCliente)) || 'Consumidor Final';
+
                   return (
                     <tr key={venda.id} className={`${quitada ? 'bg-green-50/40 opacity-70' : 'hover:bg-purple-50/20'}`}>
-                      <td className="p-3 text-zinc-500">{new Date(venda.data).toLocaleDateString('pt-BR')}</td>
+                      <td className="p-3">
+                        {quitada ? (
+                           <span className="text-zinc-500 line-through">{new Date(venda.data).toLocaleDateString('pt-BR')}</span>
+                        ) : (
+                           <div className="flex flex-col">
+                              <span className="text-zinc-800 font-bold text-sm">{dataVencimentoStr || new Date(venda.data).toLocaleDateString('pt-BR')}</span>
+                              {parcelasTotal > 1 && (
+                                <span className="text-[9px] text-red-500 font-black uppercase">Vencimento</span>
+                              )}
+                           </div>
+                        )}
+                      </td>
                       <td className="p-3 text-zinc-800 font-black">{nome}</td>
                       <td className={`p-3 font-medium ${quitada ? 'text-zinc-500 line-through' : 'text-purple-700 bg-purple-50/40'}`}>{limpa}</td>
-                      <td className={`p-3 font-black ${quitada ? 'text-zinc-400 line-through' : 'text-purple-600'}`}>{exibirMoeda(venda.total)}</td>
+                      <td className={`p-3 font-black ${quitada ? 'text-zinc-400 line-through' : 'text-purple-600'}`}>
+                         {parcelasTotal > 1 ? (
+                           <div className="flex flex-col">
+                             <span>{exibirMoeda(valorDaParcela)}</span>
+                             {!quitada && (
+                               <span className="text-[9px] text-zinc-500 font-bold uppercase mt-0.5">
+                                 Parcela {parcelasPagas + 1}/${parcelasTotal}
+                               </span>
+                             )}
+                           </div>
+                         ) : (
+                           exibirMoeda(venda.total)
+                         )}
+                      </td>
                       <td className="p-3 text-center">
                         {quitada ? <span className="bg-green-100 text-green-700 px-3 py-1 rounded text-[10px] font-black uppercase">✅ Quitado</span> : (
                           <div className="flex justify-center gap-2">
-                            <button onClick={() => handleQuitarConta(venda.id, nome)} className="bg-green-600 text-white text-[11px] font-black px-3 py-1.5 rounded uppercase">💰 Quitar</button>
-                            <button onClick={() => handleAlterarNota(venda.id, limpa)} className="bg-purple-100 text-purple-700 text-[11px] font-bold px-3 py-1.5 rounded uppercase">📝 Notas</button>
-                            <button onClick={() => handleEnviarCobrancaWhatsApp(venda, nome, limpa)} className="bg-[#25D366] text-white text-[11px] font-black px-3 py-1.5 rounded uppercase flex items-center gap-1">📱 Cobrar</button>
+                            {parcelasTotal > 1 ? (
+                               <button onClick={() => handleBaixarParcela(venda.id, parcelasPagas, parcelasTotal, nome)} className="bg-purple-600 text-white text-[11px] font-black px-3 py-1.5 rounded uppercase hover:bg-purple-800 transition-colors">
+                                 💸 Baixar Parcela
+                               </button>
+                            ) : (
+                               <button onClick={() => handleQuitarConta(venda.id, nome)} className="bg-green-600 text-white text-[11px] font-black px-3 py-1.5 rounded uppercase">💰 Quitar Total</button>
+                            )}
+
+                            <button onClick={() => handleAlterarNota(venda.id, limpa)} className="bg-purple-100 text-purple-700 text-[11px] font-bold px-3 py-1.5 rounded uppercase hover:bg-purple-200">📝 Notas</button>
+                            <button onClick={() => handleEnviarCobrancaWhatsApp(venda, nome, limpa, parcelasPagas, parcelasTotal, valorDaParcela, dataVencimentoStr)} className="bg-[#25D366] text-white text-[11px] font-black px-3 py-1.5 rounded uppercase flex items-center gap-1 hover:bg-green-600">📱 Cobrar</button>
                           </div>
                         )}
                       </td>
