@@ -39,8 +39,6 @@ export default function CaixaPage() {
   const [valoresMultiplos, setValoresMultiplos] = useState({ dinheiro: '', pix: '', credito: '', debito: '' });
   
   const [observacaoDireta, setObservacaoDireta] = useState('');
-  
-  // 🚀 CAMPOS DE PARCELAMENTO RESTAURADOS
   const [parcelasDireta, setParcelasDireta] = useState<number>(1);
   const [primeiroVencimento, setPrimeiroVencimento] = useState(() => {
     const d = new Date();
@@ -252,7 +250,6 @@ export default function CaixaPage() {
     setProcessandoVenda(true);
 
     try {
-      // 🚀 SALVA A INFORMAÇÃO COMPLETA DAS PARCELAS PARA O SISTEMA AUTOMATIZAR DEPOIS
       const formaEnvio = pagamento === 'multiplo'
         ? `multiplo:dinheiro=${(Number(valoresMultiplos.dinheiro) || 0) - trocoMultiplo};pix=${Number(valoresMultiplos.pix) || 0};credito=${Number(valoresMultiplos.credito) || 0};debito=${Number(valoresMultiplos.debito) || 0}${observacaoMultipla.trim() ? `;obs=${observacaoMultipla.replace(/[:;=]/g, ' ')}` : ''}`
         : pagamento === 'venda_direta'
@@ -561,6 +558,7 @@ export default function CaixaPage() {
           </div>
         </div>
 
+        {/* 🚀 O LADO DIREITO (CARRINHO E FINALIZAR) AGORA É INTELIGENTE E NÃO ESCONDE O BOTÃO */}
         <div className="w-full lg:w-[380px] xl:w-[420px] bg-zinc-50 flex flex-col rounded-xl shadow-xl lg:shadow-none border border-[#E0DDDD] lg:flex-shrink-0 lg:min-h-0 lg:overflow-hidden mb-6 lg:mb-0">
           
           <div className="flex-shrink-0 bg-[#6A283A] text-white p-3 flex justify-between items-center shadow-md rounded-t-xl">
@@ -568,7 +566,7 @@ export default function CaixaPage() {
             <span className="bg-white text-[#6A283A] font-black px-2 py-0.5 rounded text-xs">{carrinho.length} Itens</span>
           </div>
           
-          <div className="overflow-y-auto p-2 space-y-2 bg-white min-h-[120px] max-h-[25vh] lg:max-h-none lg:flex-1">
+          <div className="overflow-y-auto p-2 space-y-2 bg-white flex-1 min-h-[120px]">
             {carrinho.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-zinc-400 p-4 text-center py-8">
                 <span className="text-4xl opacity-50 mb-2">🛍️</span>
@@ -595,133 +593,137 @@ export default function CaixaPage() {
             )}
           </div>
 
-          <div className="flex-shrink-0 bg-white border-t-2 border-zinc-200 p-4 lg:p-3 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] rounded-b-xl">
+          {/* 🚀 CAIXA DE PAGAMENTO SEPARADA (OS CAMPOS FAZEM SCROLL AQUI DENTRO) */}
+          <div className="flex flex-col flex-shrink min-h-0 bg-white border-t-2 border-zinc-200 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] rounded-b-xl">
             
-            <div className="grid grid-cols-2 gap-3 lg:gap-2 mb-3 lg:mb-2">
-              <div>
-                <label className="text-[11px] lg:text-[10px] font-bold text-zinc-500 uppercase mb-1 lg:mb-0.5 block">🏷️ Desconto (R$)</label>
-                <input 
-                  type="number" step="0.01" value={desconto} 
-                  onChange={(e) => setDesconto(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))} 
-                  placeholder="0.00" 
-                  className="w-full p-3 lg:p-2 rounded bg-zinc-50 font-bold border border-zinc-300 outline-none text-zinc-800 text-sm lg:text-xs shadow-inner" 
-                />
-              </div>
-              <div>
-                <div className="flex justify-between items-end mb-1 lg:mb-0.5">
-                  <label className="text-[11px] lg:text-[10px] font-bold text-zinc-500 uppercase block">Vincular Cliente</label>
-                  <button type="button" onClick={() => setModalCliente(true)} className="text-[9px] font-black text-white bg-[#6A283A] px-2 py-1 lg:px-1.5 lg:py-0.5 rounded uppercase shadow-sm">➕ Novo</button>
+            <div className="p-4 lg:p-3 overflow-y-auto max-h-[45vh] lg:max-h-[40vh] space-y-3 lg:space-y-2">
+              <div className="grid grid-cols-2 gap-3 lg:gap-2">
+                <div>
+                  <label className="text-[11px] lg:text-[10px] font-bold text-zinc-500 uppercase mb-1 lg:mb-0.5 block">🏷️ Desconto (R$)</label>
+                  <input 
+                    type="number" step="0.01" value={desconto} 
+                    onChange={(e) => setDesconto(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))} 
+                    placeholder="0.00" 
+                    className="w-full p-3 lg:p-2 rounded bg-zinc-50 font-bold border border-zinc-300 outline-none text-zinc-800 text-sm lg:text-xs shadow-inner" 
+                  />
                 </div>
-                <select value={clienteSelecionado} onChange={(e) => setClienteSelecionado(e.target.value)} className="w-full p-3 lg:p-2 rounded bg-zinc-50 font-bold border border-zinc-300 outline-none text-zinc-800 text-sm lg:text-xs">
-                  <option value="">👤 Consumidor Final</option>
-                  {clientesDB.map(c => <option key={c.id} value={c.id}>{c.nome.substring(0, 15)}</option>)}
+                <div>
+                  <div className="flex justify-between items-end mb-1 lg:mb-0.5">
+                    <label className="text-[11px] lg:text-[10px] font-bold text-zinc-500 uppercase block">Vincular Cliente</label>
+                    <button type="button" onClick={() => setModalCliente(true)} className="text-[9px] font-black text-white bg-[#6A283A] px-2 py-1 lg:px-1.5 lg:py-0.5 rounded uppercase shadow-sm">➕ Novo</button>
+                  </div>
+                  <select value={clienteSelecionado} onChange={(e) => setClienteSelecionado(e.target.value)} className="w-full p-3 lg:p-2 rounded bg-zinc-50 font-bold border border-zinc-300 outline-none text-zinc-800 text-sm lg:text-xs">
+                    <option value="">👤 Consumidor Final</option>
+                    {clientesDB.map(c => <option key={c.id} value={c.id}>{c.nome.substring(0, 15)}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] lg:text-[10px] font-bold text-zinc-500 uppercase mb-1 lg:mb-0.5 block">Forma de Pagamento</label>
+                <select value={pagamento} onChange={(e) => { setPagamento(e.target.value); setValorRecebido(''); }} className="w-full p-3 lg:p-2 rounded bg-zinc-50 font-bold border border-zinc-300 outline-none text-zinc-800 text-sm lg:text-xs focus:ring-2 focus:ring-[#6A283A]">
+                  <option value="dinheiro">💵 Dinheiro</option>
+                  <option value="pix">💠 PIX</option>
+                  <option value="credito">💳 Cartão de Crédito</option>
+                  <option value="debito">💳 Cartão de Débito</option>
+                  <option value="venda_direta">📝 Venda Direta (Parcelado)</option>
+                  <option value="multiplo">🔀 Múltiplas Formas (Dividir)</option>
                 </select>
               </div>
-            </div>
 
-            <div className="mb-3 lg:mb-2">
-              <label className="text-[11px] lg:text-[10px] font-bold text-zinc-500 uppercase mb-1 lg:mb-0.5 block">Forma de Pagamento</label>
-              <select value={pagamento} onChange={(e) => { setPagamento(e.target.value); setValorRecebido(''); }} className="w-full p-3 lg:p-2 rounded bg-zinc-50 font-bold border border-zinc-300 outline-none text-zinc-800 text-sm lg:text-xs focus:ring-2 focus:ring-[#6A283A]">
-                <option value="dinheiro">💵 Dinheiro</option>
-                <option value="pix">💠 PIX</option>
-                <option value="credito">💳 Cartão de Crédito</option>
-                <option value="debito">💳 Cartão de Débito</option>
-                <option value="venda_direta">📝 Venda Direta (Parcelado)</option>
-                <option value="multiplo">🔀 Múltiplas Formas (Dividir)</option>
-              </select>
-            </div>
-
-            {/* 🚀 SISTEMA DE PARCELAMENTO REFEITO (COM DATA) */}
-            {pagamento === 'venda_direta' && (
-              <div className="mb-3 lg:mb-2 animate-in fade-in duration-200 grid grid-cols-2 gap-2">
-                <div className="col-span-2 lg:col-span-1">
-                  <label className="text-[11px] lg:text-[10px] font-bold text-purple-700 uppercase mb-1 lg:mb-0.5 block">Nº de Parcelas</label>
-                  <input type="number" min="1" max="24" value={parcelasDireta} onChange={(e) => setParcelasDireta(Number(e.target.value))} className="w-full p-3 lg:p-2 rounded bg-purple-50 text-purple-900 border-2 border-purple-200 font-bold text-sm outline-none focus:border-purple-500" />
-                </div>
-                <div className="col-span-2 lg:col-span-1">
-                  <label className="text-[11px] lg:text-[10px] font-bold text-purple-700 uppercase mb-1 lg:mb-0.5 block">1º Vencimento</label>
-                  <input type="date" value={primeiroVencimento} onChange={(e) => setPrimeiroVencimento(e.target.value)} className="w-full p-3 lg:p-2 rounded bg-purple-50 text-purple-900 border-2 border-purple-200 font-bold text-sm outline-none focus:border-purple-500" />
-                </div>
-                <div className="col-span-2">
-                  <label className="text-[11px] lg:text-[10px] font-bold text-purple-700 uppercase mb-1 lg:mb-0.5 block">📝 Nota / Combinado</label>
-                  <input type="text" value={observacaoDireta} onChange={(e) => setObservacaoDireta(e.target.value)} placeholder="Ex: Deixou com a mãe" className="w-full p-3 lg:p-2 rounded bg-purple-50 text-purple-900 border-2 border-purple-200 font-bold text-sm outline-none focus:border-purple-500" />
-                </div>
-                {parcelasDireta > 1 && totalComDesconto > 0 && (
-                  <div className="col-span-2 bg-purple-100 p-2 rounded text-[10px] text-purple-800 font-black text-center mt-1 border border-purple-200">
-                    O carnê será gerado em {parcelasDireta}x de {formataMoeda(totalComDesconto / parcelasDireta)}
+              {pagamento === 'venda_direta' && (
+                <div className="animate-in fade-in duration-200 grid grid-cols-2 gap-2">
+                  <div className="col-span-2 lg:col-span-1">
+                    <label className="text-[11px] lg:text-[10px] font-bold text-purple-700 uppercase mb-1 lg:mb-0.5 block">Nº de Parcelas</label>
+                    <input type="number" min="1" max="24" value={parcelasDireta} onChange={(e) => setParcelasDireta(Number(e.target.value))} className="w-full p-3 lg:p-2 rounded bg-purple-50 text-purple-900 border-2 border-purple-200 font-bold text-sm outline-none focus:border-purple-500" />
                   </div>
-                )}
-              </div>
-            )}
-
-            {pagamento === 'dinheiro' && (
-              <div className="grid grid-cols-2 gap-3 lg:gap-2 mb-3 lg:mb-2 animate-in fade-in duration-200 items-end">
-                <div>
-                  <label className="text-[11px] lg:text-[10px] font-bold text-zinc-500 uppercase mb-1 lg:mb-0.5 block">Recebido (R$)</label>
-                  <input type="number" step="0.01" value={valorRecebido} placeholder="Ex: 100" onChange={(e) => setValorRecebido(e.target.value ? Number(e.target.value) : '')} className="w-full p-3 lg:p-2 rounded bg-white border-2 border-[#6A283A]/40 text-[#6A283A] font-black text-base lg:text-sm outline-none" />
-                </div>
-                {Number(valorRecebido) >= totalComDesconto && totalComDesconto > 0 && (
-                  <div className="h-[44px] lg:h-[36px] px-3 lg:px-2 bg-green-100 border border-green-400 rounded-lg flex justify-between items-center shadow-inner">
-                    <span className="text-[10px] lg:text-[10px] text-green-800 uppercase font-black">Troco:</span>
-                    <span className="text-base lg:text-sm font-black text-green-700">{formataMoeda(Number(valorRecebido) - totalComDesconto)}</span>
+                  <div className="col-span-2 lg:col-span-1">
+                    <label className="text-[11px] lg:text-[10px] font-bold text-purple-700 uppercase mb-1 lg:mb-0.5 block">1º Vencimento</label>
+                    <input type="date" value={primeiroVencimento} onChange={(e) => setPrimeiroVencimento(e.target.value)} className="w-full p-3 lg:p-2 rounded bg-purple-50 text-purple-900 border-2 border-purple-200 font-bold text-sm outline-none focus:border-purple-500" />
                   </div>
-                )}
-              </div>
-            )}
-
-            {pagamento === 'multiplo' && (
-              <div className="bg-zinc-50 p-3 lg:p-2 rounded-lg border border-zinc-200 mb-3 lg:mb-2 grid grid-cols-2 gap-3 lg:gap-2 animate-in slide-in-from-top-1 duration-200">
-                <div>
-                  <label className="text-[10px] lg:text-[9px] font-black text-zinc-600 block mb-1">💵 Dinheiro</label>
-                  <input type="number" step="0.01" value={valoresMultiplos.dinheiro} onChange={(e) => setValoresMultiplos({...valoresMultiplos, dinheiro: e.target.value})} className="w-full p-2 lg:p-1.5 rounded border border-zinc-300 font-bold text-sm lg:text-xs" placeholder="0.00" />
-                </div>
-                <div>
-                  <label className="text-[10px] lg:text-[9px] font-black text-zinc-600 block mb-1">💠 PIX</label>
-                  <input type="number" step="0.01" value={valoresMultiplos.pix} onChange={(e) => setValoresMultiplos({...valoresMultiplos, pix: e.target.value})} className="w-full p-2 lg:p-1.5 rounded border border-zinc-300 font-bold text-sm lg:text-xs" placeholder="0.00" />
-                </div>
-                <div>
-                  <label className="text-[10px] lg:text-[9px] font-black text-zinc-600 block mb-1">💳 Crédito</label>
-                  <input type="number" step="0.01" value={valoresMultiplos.credito} onChange={(e) => setValoresMultiplos({...valoresMultiplos, credito: e.target.value})} className="w-full p-2 lg:p-1.5 rounded border border-zinc-300 font-bold text-sm lg:text-xs" placeholder="0.00" />
-                </div>
-                <div>
-                  <label className="text-[10px] lg:text-[9px] font-black text-zinc-600 block mb-1">💳 Débito</label>
-                  <input type="number" step="0.01" value={valoresMultiplos.debito} onChange={(e) => setValoresMultiplos({...valoresMultiplos, debito: e.target.value})} className="w-full p-2 lg:p-1.5 rounded border border-zinc-300 font-bold text-sm lg:text-xs" placeholder="0.00" />
-                </div>
-                
-                <div className="col-span-2">
-                  <label className="text-[10px] lg:text-[9px] font-black text-zinc-600 block mb-1">📝 Observação da Divisão</label>
-                  <input type="text" value={observacaoMultipla} onChange={(e) => setObservacaoMultipla(e.target.value)} className="w-full p-2 lg:p-1.5 rounded border border-zinc-300 font-bold text-sm lg:text-xs bg-white focus:border-[#6A283A] outline-none" placeholder="Ex: Cartão da mãe, PIX da tia..." />
-                </div>
-
-                <div className="col-span-2 pt-2 lg:pt-1 border-t border-zinc-200 flex justify-between items-center text-xs lg:text-[10px]">
-                  <span className="font-bold text-zinc-500">
-                    Falta: <strong className={faltaPagarMultiplo > 0 ? "text-red-600" : "text-green-600"}>{formataMoeda(Math.max(0, faltaPagarMultiplo))}</strong>
-                  </span>
-                  {trocoMultiplo > 0 && (
-                    <span className="bg-green-100 text-green-700 px-2 py-1 rounded font-black">Troco: {formataMoeda(trocoMultiplo)}</span>
+                  <div className="col-span-2">
+                    <label className="text-[11px] lg:text-[10px] font-bold text-purple-700 uppercase mb-1 lg:mb-0.5 block">📝 Nota / Combinado</label>
+                    <input type="text" value={observacaoDireta} onChange={(e) => setObservacaoDireta(e.target.value)} placeholder="Ex: Deixou com a mãe" className="w-full p-3 lg:p-2 rounded bg-purple-50 text-purple-900 border-2 border-purple-200 font-bold text-sm outline-none focus:border-purple-500" />
+                  </div>
+                  {parcelasDireta > 1 && totalComDesconto > 0 && (
+                    <div className="col-span-2 bg-purple-100 p-2 rounded text-[10px] text-purple-800 font-black text-center border border-purple-200">
+                      O carnê será gerado em {parcelasDireta}x de {formataMoeda(totalComDesconto / parcelasDireta)}
+                    </div>
                   )}
                 </div>
-              </div>
-            )}
+              )}
 
-            <div className="flex items-stretch gap-3 lg:gap-2 mt-2">
-              <div className="flex-[1.4] bg-zinc-100 border border-zinc-200 rounded-lg p-2 lg:p-1.5 flex flex-col justify-center items-center">
-                <span className="text-[10px] lg:text-[9px] text-zinc-500 font-bold uppercase tracking-widest mb-0.5">A Pagar</span>
-                <span className="text-2xl lg:text-xl font-black text-[#6A283A] leading-none">{formataMoeda(totalComDesconto)}</span>
-                {Number(desconto) > 0 && <span className="text-[10px] lg:text-[9px] text-zinc-400 line-through mt-1 lg:mt-0.5">{formataMoeda(totalCompra)}</span>}
-              </div>
+              {pagamento === 'dinheiro' && (
+                <div className="grid grid-cols-2 gap-3 lg:gap-2 animate-in fade-in duration-200 items-end">
+                  <div>
+                    <label className="text-[11px] lg:text-[10px] font-bold text-zinc-500 uppercase mb-1 lg:mb-0.5 block">Recebido (R$)</label>
+                    <input type="number" step="0.01" value={valorRecebido} placeholder="Ex: 100" onChange={(e) => setValorRecebido(e.target.value ? Number(e.target.value) : '')} className="w-full p-3 lg:p-2 rounded bg-white border-2 border-[#6A283A]/40 text-[#6A283A] font-black text-base lg:text-sm outline-none" />
+                  </div>
+                  {Number(valorRecebido) >= totalComDesconto && totalComDesconto > 0 && (
+                    <div className="h-[44px] lg:h-[36px] px-3 lg:px-2 bg-green-100 border border-green-400 rounded-lg flex justify-between items-center shadow-inner">
+                      <span className="text-[10px] lg:text-[10px] text-green-800 uppercase font-black">Troco:</span>
+                      <span className="text-base lg:text-sm font-black text-green-700">{formataMoeda(Number(valorRecebido) - totalComDesconto)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
-              <button 
-                onClick={handleFinalizarVenda} 
-                disabled={botaoDesabilitado || processandoVenda} 
-                className="flex-[2] bg-[#6A283A] text-white font-black rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#521e2d] uppercase tracking-wider text-base lg:text-sm py-4 lg:py-0 flex items-center justify-center transition-all shadow-md active:scale-95"
-              >
-                {processandoVenda ? '⏳ Gravando...' : '✅ Finalizar'}
-              </button>
+              {pagamento === 'multiplo' && (
+                <div className="bg-zinc-50 p-3 lg:p-2 rounded-lg border border-zinc-200 grid grid-cols-2 gap-3 lg:gap-2 animate-in slide-in-from-top-1 duration-200">
+                  <div>
+                    <label className="text-[10px] lg:text-[9px] font-black text-zinc-600 block mb-1">💵 Dinheiro</label>
+                    <input type="number" step="0.01" value={valoresMultiplos.dinheiro} onChange={(e) => setValoresMultiplos({...valoresMultiplos, dinheiro: e.target.value})} className="w-full p-2 lg:p-1.5 rounded border border-zinc-300 font-bold text-sm lg:text-xs" placeholder="0.00" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] lg:text-[9px] font-black text-zinc-600 block mb-1">💠 PIX</label>
+                    <input type="number" step="0.01" value={valoresMultiplos.pix} onChange={(e) => setValoresMultiplos({...valoresMultiplos, pix: e.target.value})} className="w-full p-2 lg:p-1.5 rounded border border-zinc-300 font-bold text-sm lg:text-xs" placeholder="0.00" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] lg:text-[9px] font-black text-zinc-600 block mb-1">💳 Crédito</label>
+                    <input type="number" step="0.01" value={valoresMultiplos.credito} onChange={(e) => setValoresMultiplos({...valoresMultiplos, credito: e.target.value})} className="w-full p-2 lg:p-1.5 rounded border border-zinc-300 font-bold text-sm lg:text-xs" placeholder="0.00" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] lg:text-[9px] font-black text-zinc-600 block mb-1">💳 Débito</label>
+                    <input type="number" step="0.01" value={valoresMultiplos.debito} onChange={(e) => setValoresMultiplos({...valoresMultiplos, debito: e.target.value})} className="w-full p-2 lg:p-1.5 rounded border border-zinc-300 font-bold text-sm lg:text-xs" placeholder="0.00" />
+                  </div>
+                  
+                  <div className="col-span-2">
+                    <label className="text-[10px] lg:text-[9px] font-black text-zinc-600 block mb-1">📝 Observação da Divisão</label>
+                    <input type="text" value={observacaoMultipla} onChange={(e) => setObservacaoMultipla(e.target.value)} className="w-full p-2 lg:p-1.5 rounded border border-zinc-300 font-bold text-sm lg:text-xs bg-white focus:border-[#6A283A] outline-none" placeholder="Ex: Cartão da mãe, PIX da tia..." />
+                  </div>
+
+                  <div className="col-span-2 pt-2 lg:pt-1 border-t border-zinc-200 flex justify-between items-center text-xs lg:text-[10px]">
+                    <span className="font-bold text-zinc-500">
+                      Falta: <strong className={faltaPagarMultiplo > 0 ? "text-red-600" : "text-green-600"}>{formataMoeda(Math.max(0, faltaPagarMultiplo))}</strong>
+                    </span>
+                    {trocoMultiplo > 0 && (
+                      <span className="bg-green-100 text-green-700 px-2 py-1 rounded font-black">Troco: {formataMoeda(trocoMultiplo)}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 🚀 BOTÃO FINALIZAR E TOTAL SEMPRE FIXOS AQUI NO RODAPÉ */}
+            <div className="p-4 lg:p-3 bg-zinc-50 border-t border-zinc-200 rounded-b-xl flex-shrink-0 shadow-inner">
+              <div className="flex items-stretch gap-3 lg:gap-2">
+                <div className="flex-[1.4] bg-white border border-zinc-300 rounded-lg p-2 lg:p-1.5 flex flex-col justify-center items-center shadow-sm">
+                  <span className="text-[10px] lg:text-[9px] text-zinc-500 font-bold uppercase tracking-widest mb-0.5">A Pagar</span>
+                  <span className="text-2xl lg:text-xl font-black text-[#6A283A] leading-none">{formataMoeda(totalComDesconto)}</span>
+                  {Number(desconto) > 0 && <span className="text-[10px] lg:text-[9px] text-zinc-400 line-through mt-1 lg:mt-0.5">{formataMoeda(totalCompra)}</span>}
+                </div>
+
+                <button 
+                  onClick={handleFinalizarVenda} 
+                  disabled={botaoDesabilitado || processandoVenda} 
+                  className="flex-[2] bg-[#6A283A] text-white font-black rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#521e2d] uppercase tracking-wider text-base lg:text-sm py-4 lg:py-0 flex items-center justify-center transition-all shadow-md active:scale-95"
+                >
+                  {processandoVenda ? '⏳ Gravando...' : '✅ Finalizar'}
+                </button>
+              </div>
             </div>
 
           </div>
-
         </div>
       </div>
     </div>
