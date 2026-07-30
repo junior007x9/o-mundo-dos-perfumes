@@ -36,15 +36,14 @@ export default async function ProdutosPage({
 
   const listaProdutosCompleta = await db.select().from(produtos).orderBy(desc(produtos.id));
 
-  // 🚀 PESQUISA MELHORADA: Agora varre o nome e também a marca (descrição)!
+  // 🚀 PESQUISA CORRIGIDA: Varre o nome, código e descrição/marca de forma segura
   const listaProdutos = listaProdutosCompleta.filter((p) => {
     let textoBate = true;
     if (q) {
       const termo = q.toLowerCase();
       textoBate = p.nome.toLowerCase().includes(termo) ||
                   (p.codigoBarras?.toLowerCase().includes(termo) ?? false) ||
-                  (p.descricao?.toLowerCase().includes(termo) ?? false) ||
-                  (p.marca?.toLowerCase().includes(termo) ?? false);
+                  (p.descricao?.toLowerCase().includes(termo) ?? false);
     }
 
     let estoqueBate = true;
@@ -421,9 +420,9 @@ export default async function ProdutosPage({
                     <td className="p-3">
                       <p className="font-bold text-zinc-800 text-sm md:text-base">{p.nome}</p>
                       
-                      {/* 🚀 VISUAL NA TABELA: Mostra a marca/descrição em destaque roxo! */}
-                      {(p.marca || p.descricao) && (
-                        <p className="text-[10px] font-black text-purple-600 uppercase mt-1">{p.marca || p.descricao}</p>
+                      {/* 🚀 VISUAL DA MARCA NA TABELA */}
+                      {p.descricao && (
+                        <p className="text-[10px] font-black text-purple-600 uppercase mt-1">{p.descricao}</p>
                       )}
 
                       {p.codigoBarras && (
@@ -471,9 +470,9 @@ export default async function ProdutosPage({
                   <div className="flex-1 min-w-0">
                     <p className="font-black text-zinc-800 text-base truncate">{p.nome}</p>
                     
-                    {/* Visual na versão Mobile da Tabela */}
-                    {(p.marca || p.descricao) && (
-                        <p className="text-[10px] font-black text-purple-600 uppercase mt-0.5 line-clamp-1">{p.marca || p.descricao}</p>
+                    {/* VISUAL DA MARCA NO CELULAR */}
+                    {p.descricao && (
+                        <p className="text-[10px] font-black text-purple-600 uppercase mt-0.5 line-clamp-1">{p.descricao}</p>
                     )}
 
                     {p.codigoBarras && (
