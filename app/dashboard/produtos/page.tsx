@@ -401,7 +401,8 @@ export default async function ProdutosPage({
               <span>📋</span> Estoque Atual
             </h2>
 
-            <InputPesquisa placeholder="Pesquisar nome ou marca..." />
+            {/* 🚀 PROPRIEDADE PLACEHOLDER REMOVIDA PARA EVITAR O ERRO */}
+            <InputPesquisa />
           </div>
           
           <div className="hidden md:block overflow-x-auto rounded-lg border border-[#E0DDDD]">
