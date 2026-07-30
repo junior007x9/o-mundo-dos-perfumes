@@ -42,7 +42,7 @@ export default function CaixaPage() {
   const [parcelasDireta, setParcelasDireta] = useState<number>(1);
   const [primeiroVencimento, setPrimeiroVencimento] = useState(() => {
     const d = new Date();
-    d.setMonth(d.getMonth() + 1); // Por padrão, lança para daqui a 30 dias
+    d.setMonth(d.getMonth() + 1); 
     return d.toISOString().split('T')[0];
   });
 
@@ -418,7 +418,8 @@ export default function CaixaPage() {
   }
 
   return (
-    <div className="flex flex-col gap-3 md:gap-4 lg:h-[calc(100vh-5rem)] xl:h-[calc(100vh-6rem)] lg:overflow-hidden pb-10 lg:pb-0">
+    // 🚀 AQUI O CONTAINER DO PDV ABRAÇA 100% DA TELA E CORTA O QUE PASSA PARA GERAR SCROLL INTERNO
+    <div className="flex flex-col gap-4 h-[calc(100vh-2rem)] md:h-[calc(100vh-6rem)] lg:h-[calc(100vh-8rem)]">
       
       {modalCliente && (
         <div className="fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
@@ -510,7 +511,7 @@ export default function CaixaPage() {
         </div>
       )}
 
-      <div className="flex-shrink-0 bg-white p-2 md:p-3 rounded-xl shadow-sm border border-[#E0DDDD] flex gap-2">
+      <div className="flex-shrink-0 bg-white p-3 rounded-xl shadow-sm border border-[#E0DDDD] flex gap-2">
         <div className="relative flex-1">
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
             <span className="text-zinc-400 text-lg">🔍</span>
@@ -518,39 +519,40 @@ export default function CaixaPage() {
           <input 
             ref={inputBuscaRef} type="text" value={buscaTexto} onChange={(e) => setBuscaTexto(e.target.value)}
             placeholder="Buscar por nome, marca ou código..."
-            className="w-full pl-12 pr-4 py-3 md:py-3 border border-[#E0DDDD] rounded-lg focus:ring-2 focus:ring-[#6A283A] outline-none font-bold text-sm md:text-base transition-all"
+            className="w-full pl-12 pr-4 py-3 border border-[#E0DDDD] rounded-lg focus:ring-2 focus:ring-[#6A283A] outline-none font-bold text-sm md:text-base transition-all"
             autoFocus
           />
         </div>
-        <button onClick={() => setCameraAberta(true)} className="bg-[#6A283A] text-white px-4 md:px-5 py-2 md:py-3 rounded-lg font-black uppercase text-sm md:text-base flex items-center gap-2 hover:bg-[#521e2d] transition-colors">
+        <button onClick={() => setCameraAberta(true)} className="bg-[#6A283A] text-white px-5 py-3 rounded-lg font-black uppercase text-sm md:text-base flex items-center gap-2 hover:bg-[#521e2d] transition-colors shadow-sm">
           <span className="text-xl">📷</span> <span className="hidden sm:inline">Ler Código</span>
         </button>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-4 lg:flex-1 lg:min-h-0 lg:overflow-hidden">
+      <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
         
-        <div className="bg-white flex flex-col rounded-xl shadow-sm border border-[#E0DDDD] h-[35vh] lg:h-auto lg:flex-1 lg:min-h-0 lg:overflow-hidden">
-          <div className="flex-shrink-0 flex justify-between items-center p-3 border-b border-[#E0DDDD] bg-zinc-50">
+        {/* 🚀 LADO ESQUERDO: CATÁLOGO */}
+        <div className="bg-white flex flex-col rounded-xl shadow-sm border border-[#E0DDDD] flex-1 min-h-0 overflow-hidden">
+          <div className="flex-shrink-0 flex justify-between items-center p-4 border-b border-[#E0DDDD] bg-zinc-50">
             <h2 className="text-lg font-black text-[#6A283A]">Catálogo Rápido</h2>
-            <button onClick={() => setModalFechamento(true)} className="text-xs font-bold bg-red-600 text-white px-3 py-1 rounded-full uppercase shadow-sm">🔒 Fechar Caixa</button>
+            <button onClick={() => setModalFechamento(true)} className="text-xs font-bold bg-red-600 text-white px-4 py-2 rounded-lg uppercase shadow-sm hover:bg-red-700 transition-colors">🔒 Fechar Caixa</button>
           </div>
-          <div className="flex-1 overflow-y-auto p-3">
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2">
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
               {produtosFiltrados.map((p) => (
-                <button key={p.id} onClick={() => adicionarAoCarrinho(p)} disabled={p.estoque <= 0} className={`p-3 border-2 rounded-xl text-left transition-all flex flex-col justify-between ${p.estoque > 0 ? 'border-[#E0DDDD] hover:border-[#6A283A] bg-white hover:bg-[#f9f1f0] active:scale-95 shadow-sm' : 'border-zinc-200 opacity-50 bg-zinc-100 cursor-not-allowed'}`}>
+                <button key={p.id} onClick={() => adicionarAoCarrinho(p)} disabled={p.estoque <= 0} className={`p-4 border-2 rounded-xl text-left transition-all flex flex-col justify-between ${p.estoque > 0 ? 'border-[#E0DDDD] hover:border-[#6A283A] bg-white hover:bg-[#f9f1f0] active:scale-95 shadow-sm' : 'border-zinc-200 opacity-50 bg-zinc-100 cursor-not-allowed'}`}>
                   
                   <div className="w-full">
-                    <h3 className="font-bold text-zinc-900 text-xs md:text-sm leading-tight line-clamp-2 h-8">{p.nome}</h3>
-                    <p className="text-[9px] md:text-[10px] font-black text-purple-600 uppercase mt-1 line-clamp-1 h-3">{p.marca || p.descricao || ' '}</p>
-                    <p className="text-[10px] md:text-xs font-semibold text-zinc-500 mt-2">Estoque: {p.estoque}</p>
+                    <h3 className="font-bold text-zinc-900 text-sm md:text-base leading-tight line-clamp-2 h-10">{p.nome}</h3>
+                    <p className="text-[10px] md:text-xs font-black text-purple-600 uppercase mt-1 line-clamp-1">{p.marca || p.descricao || ' '}</p>
+                    <p className="text-xs font-semibold text-zinc-500 mt-2">Estoque: {p.estoque}</p>
                   </div>
 
-                  <p className="text-sm md:text-base font-black text-[#6A283A] mt-2 border-t border-zinc-100 pt-1.5 w-full">{formataMoeda(p.precoVenda)}</p>
+                  <p className="text-lg font-black text-[#6A283A] mt-3 border-t border-zinc-100 pt-2 w-full">{formataMoeda(p.precoVenda)}</p>
                 </button>
               ))}
               {produtosFiltrados.length === 0 && (
-                <div className="col-span-full p-8 text-center text-zinc-400 font-medium text-sm flex flex-col items-center">
-                  <span className="text-3xl mb-2">🤔</span>
+                <div className="col-span-full p-8 text-center text-zinc-400 font-medium flex flex-col items-center">
+                  <span className="text-4xl mb-3 opacity-50">🤔</span>
                   Nenhum produto encontrado.
                 </div>
               )}
@@ -558,61 +560,62 @@ export default function CaixaPage() {
           </div>
         </div>
 
-        {/* 🚀 O LADO DIREITO (CARRINHO E FINALIZAR) AGORA É INTELIGENTE E NÃO ESCONDE O BOTÃO */}
-        <div className="w-full lg:w-[380px] xl:w-[420px] bg-zinc-50 flex flex-col rounded-xl shadow-xl lg:shadow-none border border-[#E0DDDD] lg:flex-shrink-0 lg:min-h-0 lg:overflow-hidden mb-6 lg:mb-0">
+        {/* 🚀 LADO DIREITO: CUPOM E PAGAMENTO */}
+        <div className="w-full lg:w-[450px] xl:w-[480px] bg-zinc-50 flex flex-col h-full rounded-xl shadow-xl border border-[#E0DDDD] flex-shrink-0 min-h-0 overflow-hidden">
           
-          <div className="flex-shrink-0 bg-[#6A283A] text-white p-3 flex justify-between items-center shadow-md rounded-t-xl">
-            <h2 className="text-sm font-black uppercase tracking-wider">🛒 Cupom Fiscal</h2>
-            <span className="bg-white text-[#6A283A] font-black px-2 py-0.5 rounded text-xs">{carrinho.length} Itens</span>
+          <div className="flex-shrink-0 bg-[#6A283A] text-white p-4 flex justify-between items-center shadow-md z-10">
+            <h2 className="text-sm font-black uppercase tracking-widest">🛒 Cupom Fiscal</h2>
+            <span className="bg-white text-[#6A283A] font-black px-3 py-1 rounded-md text-xs shadow-sm">{carrinho.length} Itens</span>
           </div>
           
-          <div className="overflow-y-auto p-2 space-y-2 bg-white flex-1 min-h-[120px]">
+          {/* ÁREA DO CARRINHO (Cresce e encolhe) */}
+          <div className="overflow-y-auto p-3 space-y-2 bg-white flex-1 min-h-[150px]">
             {carrinho.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-zinc-400 p-4 text-center py-8">
-                <span className="text-4xl opacity-50 mb-2">🛍️</span>
-                <p className="font-medium text-sm">O carrinho está vazio</p>
+              <div className="h-full flex flex-col items-center justify-center text-zinc-400 p-4 text-center">
+                <span className="text-5xl opacity-30 mb-3">🛍️</span>
+                <p className="font-bold text-sm">O carrinho está vazio</p>
               </div>
             ) : (
               carrinho.map((item) => (
-                <div key={item.id} className="flex justify-between items-center bg-white p-2.5 rounded-lg border border-zinc-200 shadow-sm">
-                  <div className="flex-1 pr-2">
-                    <p className="font-bold text-zinc-800 text-xs md:text-sm leading-tight">{item.nome}</p>
-                    
+                <div key={item.id} className="flex justify-between items-center bg-white p-3 rounded-lg border border-zinc-200 shadow-sm">
+                  <div className="flex-1 pr-3">
+                    <p className="font-bold text-zinc-800 text-sm leading-tight">{item.nome}</p>
                     {(item.marca || item.descricao) && (
-                      <p className="text-[9px] font-black text-purple-600 uppercase mt-0.5 line-clamp-1">{item.marca || item.descricao}</p>
+                      <p className="text-[10px] font-black text-purple-600 uppercase mt-0.5 line-clamp-1">{item.marca || item.descricao}</p>
                     )}
-
-                    <p className="text-[11px] md:text-xs text-zinc-500 mt-1"><strong>{item.quantidade}x</strong> {formataMoeda(item.precoVenda)}</p>
+                    <p className="text-xs text-zinc-500 mt-1"><strong>{item.quantidade}x</strong> {formataMoeda(item.precoVenda)}</p>
                   </div>
-                  <div className="flex items-center gap-3 pl-2 border-l border-zinc-100">
-                    <span className="font-black text-[#6A283A] text-sm whitespace-nowrap">{formataMoeda(item.quantidade * item.precoVenda)}</span>
-                    <button onClick={() => removerDoCarrinho(item.id)} className="text-red-500 bg-red-50 hover:bg-red-100 w-8 h-8 rounded-md flex items-center justify-center font-bold text-lg transition-colors">✖</button>
+                  <div className="flex items-center gap-3 pl-3 border-l border-zinc-100">
+                    <span className="font-black text-[#6A283A] text-base whitespace-nowrap">{formataMoeda(item.quantidade * item.precoVenda)}</span>
+                    <button onClick={() => removerDoCarrinho(item.id)} className="text-red-500 bg-red-50 hover:bg-red-100 w-10 h-10 rounded-md flex items-center justify-center font-bold text-xl transition-colors">✖</button>
                   </div>
                 </div>
               ))
             )}
           </div>
 
-          {/* 🚀 CAIXA DE PAGAMENTO SEPARADA (OS CAMPOS FAZEM SCROLL AQUI DENTRO) */}
-          <div className="flex flex-col flex-shrink min-h-0 bg-white border-t-2 border-zinc-200 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] rounded-b-xl">
+          {/* 🚀 CAIXA DE PAGAMENTO COM SCROLL PRÓPRIO E GRANDE */}
+          <div className="flex flex-col flex-shrink-0 bg-white border-t-2 border-zinc-200 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] relative z-10">
             
-            <div className="p-4 lg:p-3 overflow-y-auto max-h-[45vh] lg:max-h-[40vh] space-y-3 lg:space-y-2">
-              <div className="grid grid-cols-2 gap-3 lg:gap-2">
+            {/* CORPO DO FORMULÁRIO */}
+            <div className="p-4 md:p-5 overflow-y-auto max-h-[50vh] space-y-4">
+              
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[11px] lg:text-[10px] font-bold text-zinc-500 uppercase mb-1 lg:mb-0.5 block">🏷️ Desconto (R$)</label>
+                  <label className="text-xs font-bold text-zinc-500 uppercase mb-1.5 block">🏷️ Desconto (R$)</label>
                   <input 
                     type="number" step="0.01" value={desconto} 
                     onChange={(e) => setDesconto(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))} 
                     placeholder="0.00" 
-                    className="w-full p-3 lg:p-2 rounded bg-zinc-50 font-bold border border-zinc-300 outline-none text-zinc-800 text-sm lg:text-xs shadow-inner" 
+                    className="w-full p-3 rounded-lg bg-zinc-50 font-bold border border-zinc-300 outline-none text-zinc-800 text-sm shadow-inner focus:border-[#6A283A]" 
                   />
                 </div>
                 <div>
-                  <div className="flex justify-between items-end mb-1 lg:mb-0.5">
-                    <label className="text-[11px] lg:text-[10px] font-bold text-zinc-500 uppercase block">Vincular Cliente</label>
-                    <button type="button" onClick={() => setModalCliente(true)} className="text-[9px] font-black text-white bg-[#6A283A] px-2 py-1 lg:px-1.5 lg:py-0.5 rounded uppercase shadow-sm">➕ Novo</button>
+                  <div className="flex justify-between items-end mb-1.5">
+                    <label className="text-xs font-bold text-zinc-500 uppercase block">Vincular Cliente</label>
+                    <button type="button" onClick={() => setModalCliente(true)} className="text-[10px] font-black text-white bg-[#6A283A] px-2 py-1 rounded uppercase shadow-sm hover:bg-[#521e2d]">➕ Novo</button>
                   </div>
-                  <select value={clienteSelecionado} onChange={(e) => setClienteSelecionado(e.target.value)} className="w-full p-3 lg:p-2 rounded bg-zinc-50 font-bold border border-zinc-300 outline-none text-zinc-800 text-sm lg:text-xs">
+                  <select value={clienteSelecionado} onChange={(e) => setClienteSelecionado(e.target.value)} className="w-full p-3 rounded-lg bg-zinc-50 font-bold border border-zinc-300 outline-none text-zinc-800 text-sm focus:border-[#6A283A]">
                     <option value="">👤 Consumidor Final</option>
                     {clientesDB.map(c => <option key={c.id} value={c.id}>{c.nome.substring(0, 15)}</option>)}
                   </select>
@@ -620,8 +623,8 @@ export default function CaixaPage() {
               </div>
 
               <div>
-                <label className="text-[11px] lg:text-[10px] font-bold text-zinc-500 uppercase mb-1 lg:mb-0.5 block">Forma de Pagamento</label>
-                <select value={pagamento} onChange={(e) => { setPagamento(e.target.value); setValorRecebido(''); }} className="w-full p-3 lg:p-2 rounded bg-zinc-50 font-bold border border-zinc-300 outline-none text-zinc-800 text-sm lg:text-xs focus:ring-2 focus:ring-[#6A283A]">
+                <label className="text-xs font-bold text-zinc-500 uppercase mb-1.5 block">Forma de Pagamento</label>
+                <select value={pagamento} onChange={(e) => { setPagamento(e.target.value); setValorRecebido(''); }} className="w-full p-3 rounded-lg bg-zinc-50 font-bold border border-zinc-300 outline-none text-zinc-800 text-sm focus:border-[#6A283A]">
                   <option value="dinheiro">💵 Dinheiro</option>
                   <option value="pix">💠 PIX</option>
                   <option value="credito">💳 Cartão de Crédito</option>
@@ -632,21 +635,21 @@ export default function CaixaPage() {
               </div>
 
               {pagamento === 'venda_direta' && (
-                <div className="animate-in fade-in duration-200 grid grid-cols-2 gap-2">
-                  <div className="col-span-2 lg:col-span-1">
-                    <label className="text-[11px] lg:text-[10px] font-bold text-purple-700 uppercase mb-1 lg:mb-0.5 block">Nº de Parcelas</label>
-                    <input type="number" min="1" max="24" value={parcelasDireta} onChange={(e) => setParcelasDireta(Number(e.target.value))} className="w-full p-3 lg:p-2 rounded bg-purple-50 text-purple-900 border-2 border-purple-200 font-bold text-sm outline-none focus:border-purple-500" />
+                <div className="animate-in fade-in duration-200 grid grid-cols-2 gap-3 bg-purple-50/50 p-3 border border-purple-100 rounded-xl">
+                  <div>
+                    <label className="text-xs font-bold text-purple-700 uppercase mb-1.5 block">Nº de Parcelas</label>
+                    <input type="number" min="1" max="24" value={parcelasDireta} onChange={(e) => setParcelasDireta(Number(e.target.value))} className="w-full p-3 rounded-lg bg-white text-purple-900 border-2 border-purple-200 font-bold text-sm outline-none focus:border-purple-500 shadow-sm" />
                   </div>
-                  <div className="col-span-2 lg:col-span-1">
-                    <label className="text-[11px] lg:text-[10px] font-bold text-purple-700 uppercase mb-1 lg:mb-0.5 block">1º Vencimento</label>
-                    <input type="date" value={primeiroVencimento} onChange={(e) => setPrimeiroVencimento(e.target.value)} className="w-full p-3 lg:p-2 rounded bg-purple-50 text-purple-900 border-2 border-purple-200 font-bold text-sm outline-none focus:border-purple-500" />
+                  <div>
+                    <label className="text-xs font-bold text-purple-700 uppercase mb-1.5 block">1º Vencimento</label>
+                    <input type="date" value={primeiroVencimento} onChange={(e) => setPrimeiroVencimento(e.target.value)} className="w-full p-3 rounded-lg bg-white text-purple-900 border-2 border-purple-200 font-bold text-sm outline-none focus:border-purple-500 shadow-sm" />
                   </div>
                   <div className="col-span-2">
-                    <label className="text-[11px] lg:text-[10px] font-bold text-purple-700 uppercase mb-1 lg:mb-0.5 block">📝 Nota / Combinado</label>
-                    <input type="text" value={observacaoDireta} onChange={(e) => setObservacaoDireta(e.target.value)} placeholder="Ex: Deixou com a mãe" className="w-full p-3 lg:p-2 rounded bg-purple-50 text-purple-900 border-2 border-purple-200 font-bold text-sm outline-none focus:border-purple-500" />
+                    <label className="text-xs font-bold text-purple-700 uppercase mb-1.5 block">📝 Nota / Combinado</label>
+                    <input type="text" value={observacaoDireta} onChange={(e) => setObservacaoDireta(e.target.value)} placeholder="Ex: Deixou com a mãe" className="w-full p-3 rounded-lg bg-white text-purple-900 border-2 border-purple-200 font-bold text-sm outline-none focus:border-purple-500 shadow-sm" />
                   </div>
                   {parcelasDireta > 1 && totalComDesconto > 0 && (
-                    <div className="col-span-2 bg-purple-100 p-2 rounded text-[10px] text-purple-800 font-black text-center border border-purple-200">
+                    <div className="col-span-2 bg-purple-100 p-3 rounded-lg text-xs text-purple-800 font-black text-center border border-purple-200 shadow-sm">
                       O carnê será gerado em {parcelasDireta}x de {formataMoeda(totalComDesconto / parcelasDireta)}
                     </div>
                   )}
@@ -654,69 +657,70 @@ export default function CaixaPage() {
               )}
 
               {pagamento === 'dinheiro' && (
-                <div className="grid grid-cols-2 gap-3 lg:gap-2 animate-in fade-in duration-200 items-end">
+                <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-200 items-end">
                   <div>
-                    <label className="text-[11px] lg:text-[10px] font-bold text-zinc-500 uppercase mb-1 lg:mb-0.5 block">Recebido (R$)</label>
-                    <input type="number" step="0.01" value={valorRecebido} placeholder="Ex: 100" onChange={(e) => setValorRecebido(e.target.value ? Number(e.target.value) : '')} className="w-full p-3 lg:p-2 rounded bg-white border-2 border-[#6A283A]/40 text-[#6A283A] font-black text-base lg:text-sm outline-none" />
+                    <label className="text-xs font-bold text-zinc-500 uppercase mb-1.5 block">Recebido (R$)</label>
+                    <input type="number" step="0.01" value={valorRecebido} placeholder="Ex: 100" onChange={(e) => setValorRecebido(e.target.value ? Number(e.target.value) : '')} className="w-full p-3 rounded-lg bg-white border-2 border-[#6A283A]/40 text-[#6A283A] font-black text-base outline-none focus:border-[#6A283A] shadow-sm" />
                   </div>
                   {Number(valorRecebido) >= totalComDesconto && totalComDesconto > 0 && (
-                    <div className="h-[44px] lg:h-[36px] px-3 lg:px-2 bg-green-100 border border-green-400 rounded-lg flex justify-between items-center shadow-inner">
-                      <span className="text-[10px] lg:text-[10px] text-green-800 uppercase font-black">Troco:</span>
-                      <span className="text-base lg:text-sm font-black text-green-700">{formataMoeda(Number(valorRecebido) - totalComDesconto)}</span>
+                    <div className="h-[48px] px-3 bg-green-100 border border-green-400 rounded-lg flex justify-between items-center shadow-sm">
+                      <span className="text-[11px] text-green-800 uppercase font-black tracking-widest">Troco:</span>
+                      <span className="text-lg font-black text-green-700">{formataMoeda(Number(valorRecebido) - totalComDesconto)}</span>
                     </div>
                   )}
                 </div>
               )}
 
               {pagamento === 'multiplo' && (
-                <div className="bg-zinc-50 p-3 lg:p-2 rounded-lg border border-zinc-200 grid grid-cols-2 gap-3 lg:gap-2 animate-in slide-in-from-top-1 duration-200">
+                <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-200 grid grid-cols-2 gap-4 animate-in slide-in-from-top-1 duration-200 shadow-sm">
                   <div>
-                    <label className="text-[10px] lg:text-[9px] font-black text-zinc-600 block mb-1">💵 Dinheiro</label>
-                    <input type="number" step="0.01" value={valoresMultiplos.dinheiro} onChange={(e) => setValoresMultiplos({...valoresMultiplos, dinheiro: e.target.value})} className="w-full p-2 lg:p-1.5 rounded border border-zinc-300 font-bold text-sm lg:text-xs" placeholder="0.00" />
+                    <label className="text-[11px] font-black text-zinc-600 block mb-1.5 uppercase">💵 Dinheiro</label>
+                    <input type="number" step="0.01" value={valoresMultiplos.dinheiro} onChange={(e) => setValoresMultiplos({...valoresMultiplos, dinheiro: e.target.value})} className="w-full p-2.5 rounded-lg border border-zinc-300 font-bold text-sm focus:border-[#6A283A] outline-none" placeholder="0.00" />
                   </div>
                   <div>
-                    <label className="text-[10px] lg:text-[9px] font-black text-zinc-600 block mb-1">💠 PIX</label>
-                    <input type="number" step="0.01" value={valoresMultiplos.pix} onChange={(e) => setValoresMultiplos({...valoresMultiplos, pix: e.target.value})} className="w-full p-2 lg:p-1.5 rounded border border-zinc-300 font-bold text-sm lg:text-xs" placeholder="0.00" />
+                    <label className="text-[11px] font-black text-zinc-600 block mb-1.5 uppercase">💠 PIX</label>
+                    <input type="number" step="0.01" value={valoresMultiplos.pix} onChange={(e) => setValoresMultiplos({...valoresMultiplos, pix: e.target.value})} className="w-full p-2.5 rounded-lg border border-zinc-300 font-bold text-sm focus:border-[#6A283A] outline-none" placeholder="0.00" />
                   </div>
                   <div>
-                    <label className="text-[10px] lg:text-[9px] font-black text-zinc-600 block mb-1">💳 Crédito</label>
-                    <input type="number" step="0.01" value={valoresMultiplos.credito} onChange={(e) => setValoresMultiplos({...valoresMultiplos, credito: e.target.value})} className="w-full p-2 lg:p-1.5 rounded border border-zinc-300 font-bold text-sm lg:text-xs" placeholder="0.00" />
+                    <label className="text-[11px] font-black text-zinc-600 block mb-1.5 uppercase">💳 Crédito</label>
+                    <input type="number" step="0.01" value={valoresMultiplos.credito} onChange={(e) => setValoresMultiplos({...valoresMultiplos, credito: e.target.value})} className="w-full p-2.5 rounded-lg border border-zinc-300 font-bold text-sm focus:border-[#6A283A] outline-none" placeholder="0.00" />
                   </div>
                   <div>
-                    <label className="text-[10px] lg:text-[9px] font-black text-zinc-600 block mb-1">💳 Débito</label>
-                    <input type="number" step="0.01" value={valoresMultiplos.debito} onChange={(e) => setValoresMultiplos({...valoresMultiplos, debito: e.target.value})} className="w-full p-2 lg:p-1.5 rounded border border-zinc-300 font-bold text-sm lg:text-xs" placeholder="0.00" />
+                    <label className="text-[11px] font-black text-zinc-600 block mb-1.5 uppercase">💳 Débito</label>
+                    <input type="number" step="0.01" value={valoresMultiplos.debito} onChange={(e) => setValoresMultiplos({...valoresMultiplos, debito: e.target.value})} className="w-full p-2.5 rounded-lg border border-zinc-300 font-bold text-sm focus:border-[#6A283A] outline-none" placeholder="0.00" />
                   </div>
                   
                   <div className="col-span-2">
-                    <label className="text-[10px] lg:text-[9px] font-black text-zinc-600 block mb-1">📝 Observação da Divisão</label>
-                    <input type="text" value={observacaoMultipla} onChange={(e) => setObservacaoMultipla(e.target.value)} className="w-full p-2 lg:p-1.5 rounded border border-zinc-300 font-bold text-sm lg:text-xs bg-white focus:border-[#6A283A] outline-none" placeholder="Ex: Cartão da mãe, PIX da tia..." />
+                    <label className="text-[11px] font-black text-zinc-600 block mb-1.5 uppercase">📝 Observação da Divisão</label>
+                    <input type="text" value={observacaoMultipla} onChange={(e) => setObservacaoMultipla(e.target.value)} className="w-full p-2.5 rounded-lg border border-zinc-300 font-bold text-sm bg-white focus:border-[#6A283A] outline-none" placeholder="Ex: Cartão da mãe, PIX da tia..." />
                   </div>
 
-                  <div className="col-span-2 pt-2 lg:pt-1 border-t border-zinc-200 flex justify-between items-center text-xs lg:text-[10px]">
-                    <span className="font-bold text-zinc-500">
-                      Falta: <strong className={faltaPagarMultiplo > 0 ? "text-red-600" : "text-green-600"}>{formataMoeda(Math.max(0, faltaPagarMultiplo))}</strong>
+                  <div className="col-span-2 pt-3 border-t border-zinc-200 flex justify-between items-center text-sm">
+                    <span className="font-bold text-zinc-500 uppercase">
+                      Falta: <strong className={faltaPagarMultiplo > 0 ? "text-red-600 text-base" : "text-green-600 text-base"}>{formataMoeda(Math.max(0, faltaPagarMultiplo))}</strong>
                     </span>
                     {trocoMultiplo > 0 && (
-                      <span className="bg-green-100 text-green-700 px-2 py-1 rounded font-black">Troco: {formataMoeda(trocoMultiplo)}</span>
+                      <span className="bg-green-100 text-green-700 px-3 py-1.5 rounded-md font-black uppercase text-xs border border-green-200 shadow-sm">Troco: {formataMoeda(trocoMultiplo)}</span>
                     )}
                   </div>
                 </div>
               )}
+
             </div>
 
-            {/* 🚀 BOTÃO FINALIZAR E TOTAL SEMPRE FIXOS AQUI NO RODAPÉ */}
-            <div className="p-4 lg:p-3 bg-zinc-50 border-t border-zinc-200 rounded-b-xl flex-shrink-0 shadow-inner">
-              <div className="flex items-stretch gap-3 lg:gap-2">
-                <div className="flex-[1.4] bg-white border border-zinc-300 rounded-lg p-2 lg:p-1.5 flex flex-col justify-center items-center shadow-sm">
-                  <span className="text-[10px] lg:text-[9px] text-zinc-500 font-bold uppercase tracking-widest mb-0.5">A Pagar</span>
-                  <span className="text-2xl lg:text-xl font-black text-[#6A283A] leading-none">{formataMoeda(totalComDesconto)}</span>
-                  {Number(desconto) > 0 && <span className="text-[10px] lg:text-[9px] text-zinc-400 line-through mt-1 lg:mt-0.5">{formataMoeda(totalCompra)}</span>}
+            {/* 🚀 RODAPÉ FIXO DE FINALIZAÇÃO */}
+            <div className="p-4 md:p-5 bg-zinc-50 border-t border-zinc-200 rounded-b-xl flex-shrink-0 shadow-inner">
+              <div className="flex items-stretch gap-4">
+                <div className="flex-[1.2] bg-white border border-zinc-300 rounded-xl p-3 flex flex-col justify-center items-center shadow-sm">
+                  <span className="text-xs text-zinc-500 font-bold uppercase tracking-widest mb-1">A Pagar</span>
+                  <span className="text-3xl font-black text-[#6A283A] leading-none">{formataMoeda(totalComDesconto)}</span>
+                  {Number(desconto) > 0 && <span className="text-[10px] text-zinc-400 line-through mt-1">{formataMoeda(totalCompra)}</span>}
                 </div>
 
                 <button 
                   onClick={handleFinalizarVenda} 
                   disabled={botaoDesabilitado || processandoVenda} 
-                  className="flex-[2] bg-[#6A283A] text-white font-black rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#521e2d] uppercase tracking-wider text-base lg:text-sm py-4 lg:py-0 flex items-center justify-center transition-all shadow-md active:scale-95"
+                  className="flex-[2] bg-[#6A283A] text-white font-black rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#521e2d] uppercase tracking-widest text-lg py-5 flex items-center justify-center transition-all shadow-lg active:scale-95 border-b-4 border-black/20"
                 >
                   {processandoVenda ? '⏳ Gravando...' : '✅ Finalizar'}
                 </button>
