@@ -418,8 +418,8 @@ export default function CaixaPage() {
   }
 
   return (
-    // 🚀 ROOT WRAPPER: Oculta qualquer expansão e usa o w-full
-    <div className="flex flex-col gap-4 w-full h-full overflow-hidden">
+    // 🚀 ROOT WRAPPER: Deixa o telemóvel rolar a página inteira à vontade (min-h-screen) e trava no PC (lg:h-[calc...])
+    <div className="flex flex-col gap-4 w-full min-h-screen lg:min-h-0 lg:h-[calc(100vh-6rem)] lg:overflow-hidden pb-20 lg:pb-0">
       
       {modalCliente && (
         <div className="fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
@@ -498,7 +498,7 @@ export default function CaixaPage() {
       )}
 
       {mostrarTutorial && (
-        <div className="flex-shrink-0 bg-gradient-to-r from-blue-50 to-white p-3 rounded-xl border border-blue-200 shadow-sm flex items-center gap-3 relative">
+        <div className="flex-shrink-0 bg-gradient-to-r from-blue-50 to-white p-3 rounded-xl border border-blue-200 shadow-sm flex items-center gap-3 relative mx-1">
           <button onClick={() => setMostrarTutorial(false)} className="absolute top-2 right-2 text-blue-400 hover:text-red-500 font-bold text-xs">✖</button>
           <div className="flex-1 pr-6">
             <h3 className="font-black text-blue-900 text-xs uppercase tracking-wide">Como registrar uma venda?</h3>
@@ -512,7 +512,7 @@ export default function CaixaPage() {
       )}
 
       {/* SEARCH BAR FIXED AT TOP */}
-      <div className="flex-shrink-0 bg-white p-3 rounded-xl shadow-sm border border-[#E0DDDD] flex gap-2">
+      <div className="flex-shrink-0 bg-white p-3 rounded-xl shadow-sm border border-[#E0DDDD] flex gap-2 mx-1">
         <div className="relative flex-1">
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
             <span className="text-zinc-400 text-lg">🔍</span>
@@ -529,11 +529,12 @@ export default function CaixaPage() {
         </button>
       </div>
 
-      {/* 🚀 SPLIT VIEW COM ALTURA CALCULADA PARA MATAR O ESPAÇO VAZIO E FORÇAR SCROLL INTERNO */}
-      <div className="flex flex-col lg:flex-row gap-4 w-full" style={{ height: 'calc(100vh - 150px)' }}>
+      {/* 🚀 SPLIT VIEW CORRIGIDO: No telemóvel empilha um debaixo do outro com altura, no PC coloca lado a lado */}
+      <div className="flex flex-col lg:flex-row gap-4 w-full flex-1 lg:min-h-0 px-1 lg:px-0">
         
         {/* LADO ESQUERDO: CATÁLOGO */}
-        <div className="bg-white flex flex-col rounded-xl shadow-sm border border-[#E0DDDD] flex-1 overflow-hidden h-full">
+        {/* No telemóvel tem altura de 50vh, no PC adapta-se dinamicamente */}
+        <div className="bg-white flex flex-col rounded-xl shadow-sm border border-[#E0DDDD] flex-1 h-[55vh] lg:h-auto lg:min-h-0 overflow-hidden">
           <div className="flex-shrink-0 flex justify-between items-center p-4 border-b border-[#E0DDDD] bg-zinc-50">
             <h2 className="text-lg font-black text-[#6A283A]">Catálogo Rápido</h2>
             <button onClick={() => setModalFechamento(true)} className="text-xs font-bold bg-red-600 text-white px-4 py-2 rounded-lg uppercase shadow-sm hover:bg-red-700 transition-colors">🔒 Fechar Caixa</button>
@@ -564,15 +565,15 @@ export default function CaixaPage() {
         </div>
 
         {/* LADO DIREITO: CUPOM E PAGAMENTO */}
-        <div className="w-full lg:w-[450px] xl:w-[480px] bg-zinc-50 flex flex-col rounded-xl shadow-xl border border-[#E0DDDD] flex-shrink-0 overflow-hidden h-full">
+        <div className="w-full lg:w-[450px] xl:w-[480px] bg-zinc-50 flex flex-col rounded-xl shadow-xl border border-[#E0DDDD] flex-shrink-0 lg:min-h-0 lg:overflow-hidden">
           
-          <div className="flex-shrink-0 bg-[#6A283A] text-white p-4 flex justify-between items-center shadow-md z-10">
+          <div className="flex-shrink-0 bg-[#6A283A] text-white p-4 flex justify-between items-center shadow-md z-10 rounded-t-xl lg:rounded-none">
             <h2 className="text-sm font-black uppercase tracking-widest">🛒 Cupom Fiscal</h2>
             <span className="bg-white text-[#6A283A] font-black px-3 py-1 rounded-md text-xs shadow-sm">{carrinho.length} Itens</span>
           </div>
           
-          {/* ÁREA DO CARRINHO (Rola apenas internamente) */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-white">
+          {/* ÁREA DO CARRINHO */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-white min-h-[150px] lg:min-h-0">
             {carrinho.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-zinc-400 p-4 text-center">
                 <span className="text-5xl opacity-30 mb-3">🛍️</span>
@@ -597,10 +598,10 @@ export default function CaixaPage() {
             )}
           </div>
 
-          {/* CAIXA DE PAGAMENTO - LIMITE DE ALTURA PARA NÃO ENGOLIR O BOTÃO */}
-          <div className="flex flex-col flex-shrink-0 bg-white border-t-2 border-zinc-200 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] relative z-10">
+          {/* CAIXA DE PAGAMENTO */}
+          <div className="flex flex-col flex-shrink-0 bg-white border-t-2 border-zinc-200 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] relative z-10 lg:max-h-[55%]">
             
-            <div className="p-4 md:p-5 overflow-y-auto max-h-[45vh] space-y-4">
+            <div className="p-4 md:p-5 overflow-y-auto flex-1 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-bold text-zinc-500 uppercase mb-1.5 block">🏷️ Desconto (R$)</label>
